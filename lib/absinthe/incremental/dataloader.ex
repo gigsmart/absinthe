@@ -1,10 +1,47 @@
 defmodule Absinthe.Incremental.Dataloader do
   @moduledoc """
   Dataloader integration for incremental delivery.
-  
+
   This module ensures that batching continues to work efficiently even when
   fields are deferred or streamed. It groups deferred/streamed fields by their
   batch keys and resolves them together to maintain the benefits of batching.
+
+  ## Usage
+
+  This module is used automatically when you have both Dataloader and incremental
+  delivery enabled. No additional configuration is required for basic usage.
+
+  ### Using with existing Dataloader resolvers
+
+  Your existing Dataloader resolvers will continue to work. For optimal performance
+  with incremental delivery, you can use the streaming-aware resolver:
+
+      field :posts, list_of(:post) do
+        resolve Absinthe.Incremental.Dataloader.streaming_dataloader(:db, :posts)
+      end
+
+  This ensures that deferred fields using the same batch key are resolved together,
+  maintaining the N+1 prevention benefits of Dataloader even with @defer/@stream.
+
+  ### Manual batch control
+
+  For advanced use cases, you can manually prepare and resolve batches:
+
+      # Get grouped batches from the blueprint
+      batches = Absinthe.Incremental.Dataloader.prepare_streaming_batch(blueprint)
+
+      # Resolve each batch
+      for batch <- batches.deferred do
+        results = Absinthe.Incremental.Dataloader.resolve_streaming_batch(batch, dataloader)
+        # Process results...
+      end
+
+  ## How it works
+
+  When a query contains @defer or @stream directives, this module:
+  1. Groups deferred/streamed fields by their Dataloader batch keys
+  2. Ensures fields with the same batch key are resolved together
+  3. Maintains efficient batching even when fields are delivered incrementally
   """
   
   alias Absinthe.Resolution

@@ -1,9 +1,48 @@
 defmodule Absinthe.Incremental.Supervisor do
   @moduledoc """
   Supervisor for incremental delivery components.
-  
+
   This supervisor manages the resource manager and task supervisors
   needed for @defer and @stream operations.
+
+  ## Starting the Supervisor
+
+  To enable incremental delivery, add this supervisor to your application's
+  supervision tree in `application.ex`:
+
+      defmodule MyApp.Application do
+        use Application
+
+        def start(_type, _args) do
+          children = [
+            # ... other children
+            {Absinthe.Incremental.Supervisor, [
+              enabled: true,
+              enable_defer: true,
+              enable_stream: true,
+              max_concurrent_defers: 10,
+              max_concurrent_streams: 5
+            ]}
+          ]
+
+          opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+          Supervisor.start_link(children, opts)
+        end
+      end
+
+  ## Configuration Options
+
+  - `:enabled` - Enable/disable incremental delivery (default: false)
+  - `:enable_defer` - Enable @defer directive support (default: true when enabled)
+  - `:enable_stream` - Enable @stream directive support (default: true when enabled)
+  - `:max_concurrent_defers` - Max concurrent deferred operations (default: 100)
+  - `:max_concurrent_streams` - Max concurrent stream operations (default: 50)
+
+  ## Note
+
+  The supervisor is only required for actual incremental delivery over transports
+  (SSE, WebSocket). Standard query execution with @defer/@stream directives will
+  work without the supervisor, but will return all data in a single response.
   """
   
   use Supervisor
