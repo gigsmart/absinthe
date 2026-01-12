@@ -67,13 +67,14 @@ defmodule Absinthe.Incremental.ErrorHandler do
         task_fn.()
       rescue
         exception ->
+          stacktrace = __STACKTRACE__
           Logger.error("Streaming task error: #{Exception.message(exception)}")
-          {:error, format_exception(exception)}
+          {:error, format_exception(exception, stacktrace)}
       catch
         :exit, reason ->
           Logger.error("Streaming task exit: #{inspect(reason)}")
           {:error, {:exit, reason}}
-          
+
         :throw, value ->
           Logger.error("Streaming task throw: #{inspect(value)}")
           {:error, {:throw, value}}
@@ -313,11 +314,18 @@ defmodule Absinthe.Incremental.ErrorHandler do
     }
   end
   
-  defp format_exception(exception) do
+  defp format_exception(exception, stacktrace \\ nil) do
+    formatted_stacktrace =
+      if stacktrace do
+        Exception.format_stacktrace(stacktrace)
+      else
+        "stacktrace not available"
+      end
+
     %{
       message: Exception.message(exception),
       type: exception.__struct__,
-      stacktrace: Exception.format_stacktrace(System.stacktrace())
+      stacktrace: formatted_stacktrace
     }
   end
   

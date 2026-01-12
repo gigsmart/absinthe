@@ -65,7 +65,7 @@ defmodule Absinthe.Type.BuiltIns.Directives do
     expand fn
       %{if: false}, node ->
         # Don't defer when if: false
-        {:ok, node}
+        node
 
       args, node ->
         # Mark node for deferred execution
@@ -73,7 +73,7 @@ defmodule Absinthe.Type.BuiltIns.Directives do
           label: Map.get(args, :label),
           enabled: true
         }
-        {:ok, Blueprint.put_flag(node, :defer, defer_config)}
+        Blueprint.put_flag(node, :defer, defer_config)
     end
   end
 
@@ -101,7 +101,7 @@ defmodule Absinthe.Type.BuiltIns.Directives do
     expand fn
       %{if: false}, node ->
         # Don't stream when if: false
-        {:ok, node}
+        node
 
       args, node ->
         # Mark node for streaming execution
@@ -110,7 +110,7 @@ defmodule Absinthe.Type.BuiltIns.Directives do
           initial_count: Map.get(args, :initial_count, 0),
           enabled: true
         }
-        {:ok, Blueprint.put_flag(node, :stream, stream_config)}
+        Blueprint.put_flag(node, :stream, stream_config)
     end
   end
 end

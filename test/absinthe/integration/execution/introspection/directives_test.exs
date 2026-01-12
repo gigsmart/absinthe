@@ -25,6 +25,24 @@ defmodule Elixir.Absinthe.Integration.Execution.Introspection.DirectivesTest do
                   "directives" => [
                     %{
                       "args" => [
+                        %{
+                          "name" => "if",
+                          "type" => %{"kind" => "SCALAR", "ofType" => nil}
+                        },
+                        %{
+                          "name" => "label",
+                          "type" => %{"kind" => "SCALAR", "ofType" => nil}
+                        }
+                      ],
+                      "isRepeatable" => false,
+                      "locations" => ["FRAGMENT_SPREAD", "INLINE_FRAGMENT"],
+                      "name" => "defer",
+                      "onField" => false,
+                      "onFragment" => true,
+                      "onOperation" => false
+                    },
+                    %{
+                      "args" => [
                         %{"name" => "reason", "type" => %{"kind" => "SCALAR", "ofType" => nil}}
                       ],
                       "isRepeatable" => false,
@@ -98,6 +116,28 @@ defmodule Elixir.Absinthe.Integration.Execution.Introspection.DirectivesTest do
                           }
                         }
                       ]
+                    },
+                    %{
+                      "args" => [
+                        %{
+                          "name" => "if",
+                          "type" => %{"kind" => "SCALAR", "ofType" => nil}
+                        },
+                        %{
+                          "name" => "initialCount",
+                          "type" => %{"kind" => "SCALAR", "ofType" => nil}
+                        },
+                        %{
+                          "name" => "label",
+                          "type" => %{"kind" => "SCALAR", "ofType" => nil}
+                        }
+                      ],
+                      "isRepeatable" => false,
+                      "locations" => ["FIELD"],
+                      "name" => "stream",
+                      "onField" => true,
+                      "onFragment" => false,
+                      "onOperation" => false
                     }
                   ]
                 }

@@ -95,9 +95,9 @@ defmodule Absinthe.Incremental.Dataloader do
       case Map.get(context, :__streaming__) do
         nil ->
           # Standard dataloader resolution
-          Resolution.Helpers.dataloader(source, batch_key).
-            (parent, args, resolution)
-          
+          resolver = Resolution.Helpers.dataloader(source, batch_key)
+          resolver.(parent, args, resolution)
+
         streaming_context ->
           # Streaming-aware resolution
           resolve_with_streaming_dataloader(
@@ -224,8 +224,8 @@ defmodule Absinthe.Incremental.Dataloader do
       queue_for_batch(source, batch_key, parent, args, resolution)
     else
       # Regular dataloader resolution
-      Resolution.Helpers.dataloader(source, batch_key).
-        (parent, args, resolution)
+      resolver = Resolution.Helpers.dataloader(source, batch_key)
+      resolver.(parent, args, resolution)
     end
   end
   

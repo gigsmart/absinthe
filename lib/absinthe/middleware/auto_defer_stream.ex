@@ -256,12 +256,16 @@ defmodule Absinthe.Middleware.AutoDeferStream do
     # Check if the field type is a list
     case field.schema_node do
       %{type: type} ->
-        Absinthe.Type.list?(type)
-        
+        is_list_type?(type)
+
       _ ->
         false
     end
   end
+
+  defp is_list_type?(%Absinthe.Type.List{}), do: true
+  defp is_list_type?(%Absinthe.Type.NonNull{of_type: inner}), do: is_list_type?(inner)
+  defp is_list_type?(_), do: false
   
   defp count_child_selections(field) do
     case field do

@@ -30,6 +30,16 @@ defmodule Absinthe.IntrospectionTest do
                     "directives" => [
                       %{
                         "description" =>
+                          "Directs the executor to defer this fragment spread or inline fragment, \ndelivering it as part of a subsequent response. Used to improve latency \nfor data that is not immediately required.",
+                        "isRepeatable" => false,
+                        "locations" => ["FRAGMENT_SPREAD", "INLINE_FRAGMENT"],
+                        "name" => "defer",
+                        "onField" => false,
+                        "onFragment" => true,
+                        "onOperation" => false
+                      },
+                      %{
+                        "description" =>
                           "Marks an element of a GraphQL schema as no longer supported.",
                         "isRepeatable" => false,
                         "locations" => [
@@ -89,6 +99,16 @@ defmodule Absinthe.IntrospectionTest do
                         "locations" => ["SCALAR"],
                         "name" => "specifiedBy",
                         "onField" => false,
+                        "onFragment" => false,
+                        "onOperation" => false
+                      },
+                      %{
+                        "description" =>
+                          "Directs the executor to stream list fields, delivering list items incrementally \nin multiple responses. Used to improve latency for large lists.",
+                        "isRepeatable" => false,
+                        "locations" => ["FIELD"],
+                        "name" => "stream",
+                        "onField" => true,
                         "onFragment" => false,
                         "onOperation" => false
                       }
