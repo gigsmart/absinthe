@@ -23,11 +23,12 @@ defmodule Absinthe.Incremental.ConfigTest do
     end
 
     test "accepts custom options" do
-      config = Config.from_options(
-        enabled: true,
-        max_concurrent_streams: 50,
-        on_event: fn _, _, _ -> :ok end
-      )
+      config =
+        Config.from_options(
+          enabled: true,
+          max_concurrent_streams: 50,
+          on_event: fn _, _, _ -> :ok end
+        )
 
       assert config.enabled == true
       assert config.max_concurrent_streams == 50

@@ -44,32 +44,32 @@ defmodule Absinthe.Incremental.Supervisor do
   (SSE, WebSocket). Standard query execution with @defer/@stream directives will
   work without the supervisor, but will return all data in a single response.
   """
-  
+
   use Supervisor
-  
+
   @doc """
   Start the incremental delivery supervisor.
   """
   def start_link(opts \\ []) do
     Supervisor.start_link(__MODULE__, opts, name: __MODULE__)
   end
-  
+
   @impl true
   def init(opts) do
     config = Absinthe.Incremental.Config.from_options(opts)
-    
-    children = 
+
+    children =
       if config.enabled do
         [
           # Resource manager for tracking and limiting concurrent operations
           {Absinthe.Incremental.ResourceManager, Map.to_list(config)},
-          
+
           # Task supervisor for deferred operations
           {Task.Supervisor, name: Absinthe.Incremental.DeferredTaskSupervisor},
-          
+
           # Task supervisor for streamed operations
           {Task.Supervisor, name: Absinthe.Incremental.StreamTaskSupervisor},
-          
+
           # Telemetry reporter if enabled
           telemetry_reporter(config)
         ]
@@ -77,10 +77,10 @@ defmodule Absinthe.Incremental.Supervisor do
       else
         []
       end
-    
+
     Supervisor.init(children, strategy: :one_for_one)
   end
-  
+
   @doc """
   Check if the supervisor is running.
   """
@@ -91,7 +91,7 @@ defmodule Absinthe.Incremental.Supervisor do
       pid -> Process.alive?(pid)
     end
   end
-  
+
   @doc """
   Restart the supervisor with new configuration.
   """
@@ -100,10 +100,10 @@ defmodule Absinthe.Incremental.Supervisor do
     if running?() do
       Supervisor.stop(__MODULE__)
     end
-    
+
     start_link(opts)
   end
-  
+
   @doc """
   Get the current configuration.
   """
@@ -115,7 +115,7 @@ defmodule Absinthe.Incremental.Supervisor do
       Map.get(stats, :config)
     end
   end
-  
+
   @doc """
   Update configuration at runtime.
   """
@@ -127,7 +127,7 @@ defmodule Absinthe.Incremental.Supervisor do
       {:error, :not_running}
     end
   end
-  
+
   @doc """
   Start a deferred task under supervision.
   """
@@ -144,7 +144,7 @@ defmodule Absinthe.Incremental.Supervisor do
       {:error, :supervisor_not_running}
     end
   end
-  
+
   @doc """
   Start a streaming task under supervision.
   """
@@ -161,7 +161,7 @@ defmodule Absinthe.Incremental.Supervisor do
       {:error, :supervisor_not_running}
     end
   end
-  
+
   @doc """
   Get statistics about current operations.
   """
@@ -169,15 +169,15 @@ defmodule Absinthe.Incremental.Supervisor do
   def get_stats do
     if running?() do
       resource_stats = Absinthe.Incremental.ResourceManager.get_stats()
-      
-      deferred_tasks = 
+
+      deferred_tasks =
         Task.Supervisor.children(Absinthe.Incremental.DeferredTaskSupervisor)
         |> length()
-      
-      stream_tasks = 
+
+      stream_tasks =
         Task.Supervisor.children(Absinthe.Incremental.StreamTaskSupervisor)
         |> length()
-      
+
       Map.merge(resource_stats, %{
         active_deferred_tasks: deferred_tasks,
         active_stream_tasks: stream_tasks,
@@ -187,12 +187,13 @@ defmodule Absinthe.Incremental.Supervisor do
       {:error, :not_running}
     end
   end
-  
+
   # Private functions
-  
+
   defp telemetry_reporter(%{enable_telemetry: true}) do
     {Absinthe.Incremental.TelemetryReporter, []}
   end
+
   defp telemetry_reporter(_), do: nil
 end
 
@@ -200,10 +201,10 @@ defmodule Absinthe.Incremental.TelemetryReporter do
   @moduledoc """
   Reports telemetry events for incremental delivery operations.
   """
-  
+
   use GenServer
   require Logger
-  
+
   @events [
     [:absinthe, :incremental, :defer, :start],
     [:absinthe, :incremental, :defer, :stop],
@@ -211,11 +212,11 @@ defmodule Absinthe.Incremental.TelemetryReporter do
     [:absinthe, :incremental, :stream, :stop],
     [:absinthe, :incremental, :error]
   ]
-  
+
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
-  
+
   @impl true
   def init(_opts) do
     # Attach telemetry handlers
@@ -227,53 +228,53 @@ defmodule Absinthe.Incremental.TelemetryReporter do
         nil
       )
     end)
-    
+
     {:ok, %{}}
   end
-  
+
   @impl true
   def terminate(_reason, _state) do
     # Detach telemetry handlers
     Enum.each(@events, fn event ->
       :telemetry.detach({__MODULE__, event})
     end)
-    
+
     :ok
   end
-  
+
   defp handle_event([:absinthe, :incremental, :defer, :start], measurements, metadata, _config) do
     Logger.debug(
       "Defer operation started - label: #{metadata.label}, path: #{inspect(metadata.path)}"
     )
   end
-  
+
   defp handle_event([:absinthe, :incremental, :defer, :stop], measurements, metadata, _config) do
     duration_ms = System.convert_time_unit(measurements.duration, :native, :millisecond)
-    
+
     Logger.debug(
       "Defer operation completed - label: #{metadata.label}, duration: #{duration_ms}ms"
     )
   end
-  
+
   defp handle_event([:absinthe, :incremental, :stream, :start], measurements, metadata, _config) do
     Logger.debug(
       "Stream operation started - label: #{metadata.label}, initial_count: #{metadata.initial_count}"
     )
   end
-  
+
   defp handle_event([:absinthe, :incremental, :stream, :stop], measurements, metadata, _config) do
     duration_ms = System.convert_time_unit(measurements.duration, :native, :millisecond)
-    
+
     Logger.debug(
       "Stream operation completed - label: #{metadata.label}, " <>
-      "items_streamed: #{metadata.items_count}, duration: #{duration_ms}ms"
+        "items_streamed: #{metadata.items_count}, duration: #{duration_ms}ms"
     )
   end
-  
+
   defp handle_event([:absinthe, :incremental, :error], _measurements, metadata, _config) do
     Logger.error(
       "Incremental delivery error - type: #{metadata.error_type}, " <>
-      "operation: #{metadata.operation_id}, details: #{inspect(metadata.error)}"
+        "operation: #{metadata.operation_id}, details: #{inspect(metadata.error)}"
     )
   end
 end

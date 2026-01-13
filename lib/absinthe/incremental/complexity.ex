@@ -30,41 +30,48 @@ defmodule Absinthe.Incremental.Complexity do
     list_cost: 10,
 
     # Incremental delivery multipliers
-    defer_multiplier: 1.5,        # Deferred operations cost 50% more
-    stream_multiplier: 2.0,       # Streamed operations cost 2x more
-    nested_defer_multiplier: 2.5, # Nested defers are more expensive
+    # Deferred operations cost 50% more
+    defer_multiplier: 1.5,
+    # Streamed operations cost 2x more
+    stream_multiplier: 2.0,
+    # Nested defers are more expensive
+    nested_defer_multiplier: 2.5,
 
     # Total query limits
     max_complexity: 1000,
     max_defer_depth: 3,
-    max_defer_operations: 10,     # Maximum number of @defer directives
+    # Maximum number of @defer directives
+    max_defer_operations: 10,
     max_stream_operations: 10,
     max_total_streamed_items: 1000,
 
     # Per-chunk limits
-    max_chunk_complexity: 200,    # Max complexity for any single deferred chunk
-    max_stream_batch_complexity: 100,  # Max complexity per stream batch
-    max_initial_complexity: 500   # Max complexity for initial response
+    # Max complexity for any single deferred chunk
+    max_chunk_complexity: 200,
+    # Max complexity per stream batch
+    max_stream_batch_complexity: 100,
+    # Max complexity for initial response
+    max_initial_complexity: 500
   }
 
   @type complexity_result :: {:ok, complexity_info()} | {:error, term()}
 
   @type complexity_info :: %{
-    total_complexity: number(),
-    defer_count: non_neg_integer(),
-    stream_count: non_neg_integer(),
-    max_defer_depth: non_neg_integer(),
-    estimated_payloads: non_neg_integer(),
-    breakdown: map(),
-    chunk_complexities: list(chunk_info())
-  }
+          total_complexity: number(),
+          defer_count: non_neg_integer(),
+          stream_count: non_neg_integer(),
+          max_defer_depth: non_neg_integer(),
+          estimated_payloads: non_neg_integer(),
+          breakdown: map(),
+          chunk_complexities: list(chunk_info())
+        }
 
   @type chunk_info :: %{
-    type: :defer | :stream | :initial,
-    label: String.t() | nil,
-    path: list(),
-    complexity: number()
-  }
+          type: :defer | :stream | :initial,
+          label: String.t() | nil,
+          path: list(),
+          complexity: number()
+        }
 
   @doc """
   Analyze the complexity of a blueprint with incremental delivery.
@@ -86,7 +93,8 @@ defmodule Absinthe.Incremental.Complexity do
       defer_count: 0,
       stream_count: 0,
       max_defer_depth: 0,
-      estimated_payloads: 1,  # Initial payload
+      # Initial payload
+      estimated_payloads: 1,
       breakdown: %{
         immediate: 0,
         deferred: 0,
@@ -99,7 +107,13 @@ defmodule Absinthe.Incremental.Complexity do
       errors: []
     }
 
-    result = analyze_document(blueprint.fragments ++ blueprint.operations, blueprint.schema, config, analysis)
+    result =
+      analyze_document(
+        blueprint.fragments ++ blueprint.operations,
+        blueprint.schema,
+        config,
+        analysis
+      )
 
     # Add the final initial chunk complexity
     result = finalize_initial_chunk(result)
@@ -193,7 +207,8 @@ defmodule Absinthe.Incremental.Complexity do
 
   defp check_single_chunk(%{type: :stream, complexity: complexity, label: label}, config) do
     if complexity > config.max_stream_batch_complexity do
-      {:error, {:chunk_too_complex, :stream, label, complexity, config.max_stream_batch_complexity}}
+      {:error,
+       {:chunk_too_complex, :stream, label, complexity, config.max_stream_batch_complexity}}
     else
       :ok
     end
@@ -209,27 +224,36 @@ defmodule Absinthe.Incremental.Complexity do
     config = Map.merge(@default_config, config)
 
     node = chunk_info.node
-    chunk_analysis = analyze_node(node, blueprint.schema, config, %{
-      total_complexity: 0,
-      chunk_complexities: [],
-      defer_count: 0,
-      stream_count: 0,
-      max_defer_depth: 0,
-      estimated_payloads: 0,
-      breakdown: %{immediate: 0, deferred: 0, streamed: 0},
-      defer_stack: [],
-      current_chunk: :chunk,
-      current_chunk_complexity: 0,
-      errors: []
-    }, 0)
+
+    chunk_analysis =
+      analyze_node(
+        node,
+        blueprint.schema,
+        config,
+        %{
+          total_complexity: 0,
+          chunk_complexities: [],
+          defer_count: 0,
+          stream_count: 0,
+          max_defer_depth: 0,
+          estimated_payloads: 0,
+          breakdown: %{immediate: 0, deferred: 0, streamed: 0},
+          defer_stack: [],
+          current_chunk: :chunk,
+          current_chunk_complexity: 0,
+          errors: []
+        },
+        0
+      )
 
     complexity = chunk_analysis.total_complexity
 
-    limit = case chunk_info do
-      %{type: :defer} -> config.max_chunk_complexity
-      %{type: :stream} -> config.max_stream_batch_complexity
-      _ -> config.max_chunk_complexity
-    end
+    limit =
+      case chunk_info do
+        %{type: :defer} -> config.max_chunk_complexity
+        %{type: :stream} -> config.max_stream_batch_complexity
+        _ -> config.max_chunk_complexity
+      end
 
     if complexity > limit do
       {:error, {:chunk_too_complex, chunk_info.type, chunk_info[:label], complexity, limit}}
@@ -322,12 +346,17 @@ defmodule Absinthe.Incremental.Complexity do
 
     # If we entered a deferred fragment, track its complexity separately
     # and increment depth for nested content
-    {analysis, nested_depth} = if in_defer do
-      # Start a new chunk and increase depth for nested defers
-      {%{analysis | current_chunk: {:defer, get_defer_label(node)}, current_chunk_complexity: 0}, depth + 1}
-    else
-      {analysis, depth}
-    end
+    {analysis, nested_depth} =
+      if in_defer do
+        # Start a new chunk and increase depth for nested defers
+        {%{
+           analysis
+           | current_chunk: {:defer, get_defer_label(node)},
+             current_chunk_complexity: 0
+         }, depth + 1}
+      else
+        {analysis, depth}
+      end
 
     analysis = analyze_selections(node.selections, schema, config, analysis, nested_depth)
 
@@ -359,7 +388,8 @@ defmodule Absinthe.Incremental.Complexity do
         chunk = %{
           type: :stream,
           label: stream_config[:label],
-          path: [],  # Would need path tracking
+          # Would need path tracking
+          path: [],
           complexity: stream_cost
         }
 
@@ -447,10 +477,12 @@ defmodule Absinthe.Incremental.Complexity do
 
   defp get_defer_label(node) do
     case Map.get(node, :directives) do
-      nil -> nil
+      nil ->
+        nil
+
       directives ->
         directives
-        |> Enum.find(& &1.name == "defer")
+        |> Enum.find(&(&1.name == "defer"))
         |> case do
           nil -> nil
           directive -> get_directive_arg(directive, "label")
@@ -461,22 +493,24 @@ defmodule Absinthe.Incremental.Complexity do
   defp has_defer_directive?(node) do
     case Map.get(node, :directives) do
       nil -> false
-      directives -> Enum.any?(directives, & &1.name == "defer")
+      directives -> Enum.any?(directives, &(&1.name == "defer"))
     end
   end
 
   defp has_stream_directive?(node) do
     case Map.get(node, :directives) do
       nil -> false
-      directives -> Enum.any?(directives, & &1.name == "stream")
+      directives -> Enum.any?(directives, &(&1.name == "stream"))
     end
   end
 
   defp get_stream_config(node) do
     node.directives
-    |> Enum.find(& &1.name == "stream")
+    |> Enum.find(&(&1.name == "stream"))
     |> case do
-      nil -> %{}
+      nil ->
+        %{}
+
       directive ->
         %{
           initial_count: get_directive_arg(directive, "initialCount", 0),
@@ -487,7 +521,7 @@ defmodule Absinthe.Incremental.Complexity do
 
   defp get_directive_arg(directive, name, default \\ nil) do
     directive.arguments
-    |> Enum.find(& &1.name == name)
+    |> Enum.find(&(&1.name == name))
     |> case do
       nil -> default
       arg -> arg.value
@@ -552,7 +586,8 @@ defmodule Absinthe.Incremental.Complexity do
     Enum.reduce(streamed_fields, 0, fn field, acc ->
       # Estimate batches based on initial_count
       initial_count = Map.get(field, :initial_count, 0)
-      estimated_total = initial_count + 50  # Estimate remaining items
+      # Estimate remaining items
+      estimated_total = initial_count + 50
       batches = div(estimated_total - initial_count, 10) + 1
       acc + batches
     end)

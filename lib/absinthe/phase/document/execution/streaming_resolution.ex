@@ -81,9 +81,11 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
 
     # Store collected nodes in streaming context
     streaming_context = get_streaming_context(updated_blueprint)
-    updated_streaming_context = %{streaming_context |
-      deferred_fragments: Enum.reverse(collected.deferred_fragments),
-      streamed_fields: Enum.reverse(collected.streamed_fields)
+
+    updated_streaming_context = %{
+      streaming_context
+      | deferred_fragments: Enum.reverse(collected.deferred_fragments),
+        streamed_fields: Enum.reverse(collected.streamed_fields)
     }
 
     put_streaming_context(updated_blueprint, updated_streaming_context)
@@ -143,17 +145,21 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
 
   # Mark a node to be skipped in initial resolution
   defp mark_for_skip(node) do
-    flags = node.flags
-            |> Map.delete(:defer)
-            |> Map.put(:__skip_initial__, true)
+    flags =
+      node.flags
+      |> Map.delete(:defer)
+      |> Map.put(:__skip_initial__, true)
+
     %{node | flags: flags}
   end
 
   # Mark a field for streaming (partial resolution)
   defp mark_for_streaming(node, stream_config) do
-    flags = node.flags
-            |> Map.delete(:stream)
-            |> Map.put(:__stream_config__, stream_config)
+    flags =
+      node.flags
+      |> Map.delete(:stream)
+      |> Map.put(:__stream_config__, stream_config)
+
     %{node | flags: flags}
   end
 
@@ -161,9 +167,11 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
   defp build_node_path(%{name: name}, parent_path) when is_binary(name) do
     parent_path ++ [name]
   end
+
   defp build_node_path(%Absinthe.Blueprint.Document.Fragment.Spread{name: name}, parent_path) do
     parent_path ++ [name]
   end
+
   defp build_node_path(_node, parent_path) do
     parent_path
   end
@@ -218,9 +226,10 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
   defp create_deferred_tasks(blueprint, options) do
     streaming_context = get_streaming_context(blueprint)
 
-    deferred_tasks = Enum.map(streaming_context.deferred_fragments, fn fragment_info ->
-      create_deferred_task(fragment_info, blueprint, options)
-    end)
+    deferred_tasks =
+      Enum.map(streaming_context.deferred_fragments, fn fragment_info ->
+        create_deferred_task(fragment_info, blueprint, options)
+      end)
 
     updated_context = %{streaming_context | deferred_tasks: deferred_tasks}
     put_streaming_context(blueprint, updated_context)
@@ -230,9 +239,10 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
   defp create_stream_tasks(blueprint, options) do
     streaming_context = get_streaming_context(blueprint)
 
-    stream_tasks = Enum.map(streaming_context.streamed_fields, fn field_info ->
-      create_stream_task(field_info, blueprint, options)
-    end)
+    stream_tasks =
+      Enum.map(streaming_context.streamed_fields, fn field_info ->
+        create_stream_task(field_info, blueprint, options)
+      end)
 
     updated_context = %{streaming_context | stream_tasks: stream_tasks}
     put_streaming_context(blueprint, updated_context)
@@ -286,11 +296,12 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
     end
   rescue
     e ->
-      {:error, %{
-        message: Exception.message(e),
-        path: fragment_info.path,
-        extensions: %{code: "DEFERRED_RESOLUTION_ERROR"}
-      }}
+      {:error,
+       %{
+         message: Exception.message(e),
+         path: fragment_info.path,
+         extensions: %{code: "DEFERRED_RESOLUTION_ERROR"}
+       }}
   end
 
   # Resolve remaining items for a streamed field
@@ -311,11 +322,12 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
     end
   rescue
     e ->
-      {:error, %{
-        message: Exception.message(e),
-        path: field_info.path,
-        extensions: %{code: "STREAM_RESOLUTION_ERROR"}
-      }}
+      {:error,
+       %{
+         message: Exception.message(e),
+         path: field_info.path,
+         extensions: %{code: "STREAM_RESOLUTION_ERROR"}
+       }}
   end
 
   # Restore a deferred node for resolution
@@ -334,6 +346,7 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
   defp get_parent_data(blueprint, []) do
     blueprint.result[:data] || %{}
   end
+
   defp get_parent_data(blueprint, path) do
     parent_path = Enum.drop(path, -1)
     get_in(blueprint.result, [:data | parent_path]) || %{}
@@ -342,16 +355,10 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
   # Build a sub-blueprint for resolving deferred/streamed content
   defp build_sub_blueprint(blueprint, node, parent_data, path) do
     # Create execution context with parent data
-    execution = %{blueprint.execution |
-      root_value: parent_data,
-      path: path
-    }
+    execution = %{blueprint.execution | root_value: parent_data, path: path}
 
     # Create a minimal blueprint with just the node to resolve
-    %{blueprint |
-      execution: execution,
-      operations: [wrap_in_operation(node, blueprint)]
-    }
+    %{blueprint | execution: execution, operations: [wrap_in_operation(node, blueprint)]}
   end
 
   # Wrap a node in a minimal operation structure
@@ -415,16 +422,17 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
 
   defp has_pending_operations?(streaming_context) do
     not Enum.empty?(streaming_context.deferred_fragments) or
-    not Enum.empty?(streaming_context.streamed_fields)
+      not Enum.empty?(streaming_context.streamed_fields)
   end
 
   defp get_streaming_context(blueprint) do
-    get_in(blueprint.execution.context, [:__streaming__]) || %{
-      deferred_fragments: [],
-      streamed_fields: [],
-      deferred_tasks: [],
-      stream_tasks: []
-    }
+    get_in(blueprint.execution.context, [:__streaming__]) ||
+      %{
+        deferred_fragments: [],
+        streamed_fields: [],
+        deferred_tasks: [],
+        stream_tasks: []
+      }
   end
 
   defp put_streaming_context(blueprint, context) do

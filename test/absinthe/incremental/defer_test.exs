@@ -21,21 +21,23 @@ defmodule Absinthe.Incremental.DeferTest do
         arg :id, non_null(:id)
 
         resolve fn %{id: id}, _ ->
-          {:ok, %{
-            id: id,
-            name: "User #{id}",
-            email: "user#{id}@example.com"
-          }}
+          {:ok,
+           %{
+             id: id,
+             name: "User #{id}",
+             email: "user#{id}@example.com"
+           }}
         end
       end
 
       field :users, list_of(:user) do
         resolve fn _, _ ->
-          {:ok, [
-            %{id: "1", name: "User 1", email: "user1@example.com"},
-            %{id: "2", name: "User 2", email: "user2@example.com"},
-            %{id: "3", name: "User 3", email: "user3@example.com"}
-          ]}
+          {:ok,
+           [
+             %{id: "1", name: "User 1", email: "user1@example.com"},
+             %{id: "2", name: "User 2", email: "user2@example.com"},
+             %{id: "3", name: "User 3", email: "user3@example.com"}
+           ]}
         end
       end
     end
@@ -47,20 +49,22 @@ defmodule Absinthe.Incremental.DeferTest do
 
       field :profile, :profile do
         resolve fn user, _, _ ->
-          {:ok, %{
-            bio: "Bio for #{user.name}",
-            avatar: "avatar_#{user.id}.jpg",
-            followers: 100
-          }}
+          {:ok,
+           %{
+             bio: "Bio for #{user.name}",
+             avatar: "avatar_#{user.id}.jpg",
+             followers: 100
+           }}
         end
       end
 
       field :posts, list_of(:post) do
         resolve fn user, _, _ ->
-          {:ok, [
-            %{id: "p1", title: "Post 1 by #{user.name}"},
-            %{id: "p2", title: "Post 2 by #{user.name}"}
-          ]}
+          {:ok,
+           [
+             %{id: "p1", title: "Post 1 by #{user.name}"},
+             %{id: "p2", title: "Post 2 by #{user.name}"}
+           ]}
         end
       end
     end
@@ -128,7 +132,7 @@ defmodule Absinthe.Incremental.DeferTest do
 
       # Check that the directive was parsed
       assert length(fragment_spread.directives) > 0
-      defer_directive = Enum.find(fragment_spread.directives, & &1.name == "defer")
+      defer_directive = Enum.find(fragment_spread.directives, &(&1.name == "defer"))
       assert defer_directive != nil
     end
 
@@ -152,7 +156,7 @@ defmodule Absinthe.Incremental.DeferTest do
       assert inline_fragment != nil
 
       # Check the directive
-      defer_directive = Enum.find(inline_fragment.directives, & &1.name == "defer")
+      defer_directive = Enum.find(inline_fragment.directives, &(&1.name == "defer"))
       assert defer_directive != nil
     end
 
@@ -239,6 +243,7 @@ defmodule Absinthe.Incremental.DeferTest do
       # With shouldDefer: false
       assert {:ok, blueprint_false} = run_phases(query, %{"shouldDefer" => false})
       inline_false = find_node(blueprint_false, Absinthe.Blueprint.Document.Fragment.Inline)
+
       if Map.has_key?(inline_false.flags, :defer) do
         assert inline_false.flags.defer.enabled == false
       end
@@ -285,10 +290,12 @@ defmodule Absinthe.Incremental.DeferTest do
   end
 
   defp find_node(blueprint, type) do
-    {_, found} = Blueprint.prewalk(blueprint, nil, fn
-      %{__struct__: ^type} = node, nil -> {node, node}
-      node, acc -> {node, acc}
-    end)
+    {_, found} =
+      Blueprint.prewalk(blueprint, nil, fn
+        %{__struct__: ^type} = node, nil -> {node, node}
+        node, acc -> {node, acc}
+      end)
+
     found
   end
 end

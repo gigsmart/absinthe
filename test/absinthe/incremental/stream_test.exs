@@ -19,17 +19,19 @@ defmodule Absinthe.Incremental.StreamTest do
     query do
       field :users, list_of(:user) do
         resolve fn _, _ ->
-          {:ok, Enum.map(1..10, fn i ->
-            %{id: "#{i}", name: "User #{i}"}
-          end)}
+          {:ok,
+           Enum.map(1..10, fn i ->
+             %{id: "#{i}", name: "User #{i}"}
+           end)}
         end
       end
 
       field :posts, list_of(:post) do
         resolve fn _, _ ->
-          {:ok, Enum.map(1..20, fn i ->
-            %{id: "#{i}", title: "Post #{i}"}
-          end)}
+          {:ok,
+           Enum.map(1..20, fn i ->
+             %{id: "#{i}", title: "Post #{i}"}
+           end)}
         end
       end
     end
@@ -40,9 +42,10 @@ defmodule Absinthe.Incremental.StreamTest do
 
       field :friends, list_of(:user) do
         resolve fn _, _, _ ->
-          {:ok, Enum.map(1..3, fn i ->
-            %{id: "f#{i}", name: "Friend #{i}"}
-          end)}
+          {:ok,
+           Enum.map(1..3, fn i ->
+             %{id: "f#{i}", name: "Friend #{i}"}
+           end)}
         end
       end
     end
@@ -53,9 +56,10 @@ defmodule Absinthe.Incremental.StreamTest do
 
       field :comments, list_of(:comment) do
         resolve fn _, _, _ ->
-          {:ok, Enum.map(1..5, fn i ->
-            %{id: "c#{i}", text: "Comment #{i}"}
-          end)}
+          {:ok,
+           Enum.map(1..5, fn i ->
+             %{id: "c#{i}", text: "Comment #{i}"}
+           end)}
         end
       end
     end
@@ -117,7 +121,7 @@ defmodule Absinthe.Incremental.StreamTest do
 
       # Check that the directive was parsed
       assert length(users_field.directives) > 0
-      stream_directive = Enum.find(users_field.directives, & &1.name == "stream")
+      stream_directive = Enum.find(users_field.directives, &(&1.name == "stream"))
       assert stream_directive != nil
     end
 
@@ -213,6 +217,7 @@ defmodule Absinthe.Incremental.StreamTest do
       # With shouldStream: false
       assert {:ok, blueprint_false} = run_phases(query, %{"shouldStream" => false})
       users_false = find_field(blueprint_false, "users")
+
       if Map.has_key?(users_false.flags, :stream) do
         assert users_false.flags.stream.enabled == false
       end
@@ -293,19 +298,23 @@ defmodule Absinthe.Incremental.StreamTest do
   end
 
   defp find_field(blueprint, name) do
-    {_, found} = Blueprint.prewalk(blueprint, nil, fn
-      %Absinthe.Blueprint.Document.Field{name: ^name} = node, nil -> {node, node}
-      node, acc -> {node, acc}
-    end)
+    {_, found} =
+      Blueprint.prewalk(blueprint, nil, fn
+        %Absinthe.Blueprint.Document.Field{name: ^name} = node, nil -> {node, node}
+        node, acc -> {node, acc}
+      end)
+
     found
   end
 
   defp find_nested_field(blueprint, name) do
     # Find a field that's nested inside another field
-    {_, found} = Blueprint.prewalk(blueprint, nil, fn
-      %Absinthe.Blueprint.Document.Field{name: ^name} = node, _acc -> {node, node}
-      node, acc -> {node, acc}
-    end)
+    {_, found} =
+      Blueprint.prewalk(blueprint, nil, fn
+        %Absinthe.Blueprint.Document.Field{name: ^name} = node, _acc -> {node, node}
+        node, acc -> {node, acc}
+      end)
+
     found
   end
 end

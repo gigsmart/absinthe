@@ -215,7 +215,7 @@ defmodule Absinthe.Incremental.Transport do
 
         all_tasks =
           Map.get(streaming_context, :deferred_tasks, []) ++
-          Map.get(streaming_context, :stream_tasks, [])
+            Map.get(streaming_context, :stream_tasks, [])
 
         if Enum.empty?(all_tasks) do
           {:ok, state}
@@ -250,19 +250,28 @@ defmodule Absinthe.Incremental.Transport do
             {{:ok, {task, result, task_started}}, index}, {:ok, acc_state} ->
               has_next = index < task_count - 1
 
-              case send_task_result(acc_state, task, result, has_next, config, operation_id, task_started) do
+              case send_task_result(
+                     acc_state,
+                     task,
+                     result,
+                     has_next,
+                     config,
+                     operation_id,
+                     task_started
+                   ) do
                 {:ok, new_state} -> {:cont, {:ok, new_state}}
                 {:error, _} = error -> {:halt, error}
               end
 
             {{:exit, :timeout}, _index}, {:ok, acc_state} ->
               # Handle timeout - send error response and continue
-              error_response = Response.build_error(
-                [%{message: "Operation timed out"}],
-                [],
-                nil,
-                false
-              )
+              error_response =
+                Response.build_error(
+                  [%{message: "Operation timed out"}],
+                  [],
+                  nil,
+                  false
+                )
 
               emit_error_event(config, :timeout, operation_id, started_at)
 
@@ -273,12 +282,13 @@ defmodule Absinthe.Incremental.Transport do
 
             {{:exit, reason}, _index}, {:ok, acc_state} ->
               # Handle other exits
-              error_response = Response.build_error(
-                [%{message: "Operation failed: #{inspect(reason)}"}],
-                [],
-                nil,
-                false
-              )
+              error_response =
+                Response.build_error(
+                  [%{message: "Operation failed: #{inspect(reason)}"}],
+                  [],
+                  nil,
+                  false
+                )
 
               emit_error_event(config, reason, operation_id, started_at)
 
@@ -312,7 +322,8 @@ defmodule Absinthe.Incremental.Transport do
           @telemetry_payload,
           %{
             system_time: System.system_time(),
-            duration: duration_ms * 1_000_000  # Convert to native time units
+            # Convert to native time units
+            duration: duration_ms * 1_000_000
           },
           Map.merge(metadata, %{response: response})
         )
@@ -345,11 +356,12 @@ defmodule Absinthe.Incremental.Transport do
       end
 
       defp build_task_response(task, {:error, error}, has_next) do
-        errors = case error do
-          %{message: _} = err -> [err]
-          message when is_binary(message) -> [%{message: message}]
-          other -> [%{message: inspect(other)}]
-        end
+        errors =
+          case error do
+            %{message: _} = err -> [err]
+            message when is_binary(message) -> [%{message: message}]
+            other -> [%{message: inspect(other)}]
+          end
 
         Response.build_error(
           errors,
@@ -386,7 +398,8 @@ defmodule Absinthe.Incremental.Transport do
           @telemetry_complete,
           %{
             system_time: System.system_time(),
-            duration: duration_ms * 1_000_000  # Convert to native time units
+            # Convert to native time units
+            duration: duration_ms * 1_000_000
           },
           metadata
         )
@@ -413,7 +426,8 @@ defmodule Absinthe.Incremental.Transport do
           @telemetry_error,
           %{
             system_time: System.system_time(),
-            duration: duration_ms * 1_000_000  # Convert to native time units
+            # Convert to native time units
+            duration: duration_ms * 1_000_000
           },
           Map.merge(metadata, %{error: payload})
         )
@@ -426,7 +440,7 @@ defmodule Absinthe.Incremental.Transport do
       defp format_error_message({:error, msg}) when is_binary(msg), do: msg
       defp format_error_message(reason), do: inspect(reason)
 
-      defoverridable [handle_streaming_response: 3]
+      defoverridable handle_streaming_response: 3
     end
   end
 
@@ -460,7 +474,7 @@ defmodule Absinthe.Incremental.Transport do
   This is the main entry point that transport implementations call.
   """
   @spec execute(module(), conn_or_socket, Blueprint.t(), Keyword.t()) ::
-    {:ok, state} | {:error, term()}
+          {:ok, state} | {:error, term()}
   def execute(transport_module, conn_or_socket, blueprint, options \\ []) do
     if incremental_delivery_enabled?(blueprint) do
       transport_module.handle_streaming_response(conn_or_socket, blueprint, options)
@@ -483,7 +497,7 @@ defmodule Absinthe.Incremental.Transport do
 
     all_tasks =
       Map.get(streaming_context, :deferred_tasks, []) ++
-      Map.get(streaming_context, :stream_tasks, [])
+        Map.get(streaming_context, :stream_tasks, [])
 
     incremental_results =
       all_tasks
@@ -515,10 +529,11 @@ defmodule Absinthe.Incremental.Transport do
           %{errors: [%{message: "Task failed: #{inspect(reason)}"}]}
       end)
 
-    {:ok, %{
-      initial: initial,
-      incremental: incremental_results,
-      hasNext: false
-    }}
+    {:ok,
+     %{
+       initial: initial,
+       incremental: incremental_results,
+       hasNext: false
+     }}
   end
 end

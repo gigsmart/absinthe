@@ -55,10 +55,12 @@ defmodule Absinthe.Type.BuiltIns.IncrementalDirectives do
 
     arg :if, :boolean,
       default_value: true,
-      description: "When true, fragment may be deferred. When false, fragment will not be deferred and data will be included in the initial response. Defaults to true."
+      description:
+        "When true, fragment may be deferred. When false, fragment will not be deferred and data will be included in the initial response. Defaults to true."
 
     arg :label, :string,
-      description: "A unique label for this deferred fragment, used to identify it in the incremental response."
+      description:
+        "A unique label for this deferred fragment, used to identify it in the incremental response."
 
     on [:fragment_spread, :inline_fragment]
 
@@ -73,6 +75,7 @@ defmodule Absinthe.Type.BuiltIns.IncrementalDirectives do
           label: Map.get(args, :label),
           enabled: true
         }
+
         Blueprint.put_flag(node, :defer, defer_config)
     end
   end
@@ -87,10 +90,12 @@ defmodule Absinthe.Type.BuiltIns.IncrementalDirectives do
 
     arg :if, :boolean,
       default_value: true,
-      description: "When true, list field may be streamed. When false, list will not be streamed and all data will be included in the initial response. Defaults to true."
+      description:
+        "When true, list field may be streamed. When false, list will not be streamed and all data will be included in the initial response. Defaults to true."
 
     arg :label, :string,
-      description: "A unique label for this streamed field, used to identify it in the incremental response."
+      description:
+        "A unique label for this streamed field, used to identify it in the incremental response."
 
     arg :initial_count, :integer,
       default_value: 0,
@@ -110,6 +115,7 @@ defmodule Absinthe.Type.BuiltIns.IncrementalDirectives do
           initial_count: Map.get(args, :initial_count, 0),
           enabled: true
         }
+
         Blueprint.put_flag(node, :stream, stream_config)
     end
   end

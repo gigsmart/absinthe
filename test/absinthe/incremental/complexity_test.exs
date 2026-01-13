@@ -120,7 +120,8 @@ defmodule Absinthe.Incremental.ComplexityTest do
 
       assert info.defer_count == 1
       assert info.max_defer_depth >= 1
-      assert info.estimated_payloads >= 2  # Initial + deferred
+      # Initial + deferred
+      assert info.estimated_payloads >= 2
     end
 
     test "calculates complexity with @stream" do
@@ -137,7 +138,8 @@ defmodule Absinthe.Incremental.ComplexityTest do
       {:ok, info} = Complexity.analyze(blueprint)
 
       assert info.stream_count == 1
-      assert info.estimated_payloads >= 2  # Initial + streamed batches
+      # Initial + streamed batches
+      assert info.estimated_payloads >= 2
     end
 
     test "tracks nested @defer depth" do
@@ -183,7 +185,8 @@ defmodule Absinthe.Incremental.ComplexityTest do
       {:ok, info} = Complexity.analyze(blueprint)
 
       assert info.defer_count == 3
-      assert info.estimated_payloads >= 4  # Initial + 3 deferred
+      # Initial + 3 deferred
+      assert info.estimated_payloads >= 4
     end
 
     test "provides breakdown by type" do
