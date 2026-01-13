@@ -4,6 +4,67 @@ defmodule Absinthe.Incremental.Transport do
 
   This module provides a behaviour and common functionality for implementing
   incremental delivery over various transport mechanisms (HTTP/SSE, WebSocket, etc.).
+
+  ## Telemetry Events
+
+  The following telemetry events are emitted during incremental delivery for
+  instrumentation libraries (e.g., opentelemetry_absinthe):
+
+  ### `[:absinthe, :incremental, :delivery, :initial]`
+
+  Emitted when the initial response is sent.
+
+  **Measurements:**
+  - `system_time` - System time when the event occurred
+
+  **Metadata:**
+  - `operation_id` - Unique identifier for the operation
+  - `has_next` - Boolean indicating if more payloads are expected
+  - `pending_count` - Number of pending deferred/streamed operations
+  - `response` - The initial response payload
+
+  ### `[:absinthe, :incremental, :delivery, :payload]`
+
+  Emitted when each incremental payload is delivered.
+
+  **Measurements:**
+  - `system_time` - System time when the event occurred
+  - `duration` - Time taken to execute the deferred/streamed task (native units)
+
+  **Metadata:**
+  - `operation_id` - Unique identifier for the operation
+  - `path` - GraphQL path to the deferred/streamed field
+  - `label` - Label from @defer or @stream directive
+  - `task_type` - `:defer` or `:stream`
+  - `has_next` - Boolean indicating if more payloads are expected
+  - `duration_ms` - Duration in milliseconds
+  - `success` - Boolean indicating if the task succeeded
+  - `response` - The incremental response payload
+
+  ### `[:absinthe, :incremental, :delivery, :complete]`
+
+  Emitted when incremental delivery completes successfully.
+
+  **Measurements:**
+  - `system_time` - System time when the event occurred
+  - `duration` - Total duration of the incremental delivery (native units)
+
+  **Metadata:**
+  - `operation_id` - Unique identifier for the operation
+  - `duration_ms` - Total duration in milliseconds
+
+  ### `[:absinthe, :incremental, :delivery, :error]`
+
+  Emitted when an error occurs during incremental delivery.
+
+  **Measurements:**
+  - `system_time` - System time when the event occurred
+  - `duration` - Duration until the error occurred (native units)
+
+  **Metadata:**
+  - `operation_id` - Unique identifier for the operation
+  - `duration_ms` - Duration in milliseconds
+  - `error` - Map containing `:reason` and `:message` keys
   """
 
   alias Absinthe.Blueprint
@@ -42,11 +103,22 @@ defmodule Absinthe.Incremental.Transport do
 
   @default_timeout 30_000
 
+  @telemetry_initial [:absinthe, :incremental, :delivery, :initial]
+  @telemetry_payload [:absinthe, :incremental, :delivery, :payload]
+  @telemetry_complete [:absinthe, :incremental, :delivery, :complete]
+  @telemetry_error [:absinthe, :incremental, :delivery, :error]
+
   defmacro __using__(_opts) do
     quote do
       @behaviour Absinthe.Incremental.Transport
 
       alias Absinthe.Incremental.{Config, Response, ErrorHandler}
+
+      # Telemetry event names for instrumentation (e.g., opentelemetry_absinthe)
+      @telemetry_initial unquote(@telemetry_initial)
+      @telemetry_payload unquote(@telemetry_payload)
+      @telemetry_complete unquote(@telemetry_complete)
+      @telemetry_error unquote(@telemetry_error)
 
       @doc """
       Handle a streaming response from the resolution phase.
@@ -118,11 +190,21 @@ defmodule Absinthe.Incremental.Transport do
         config = Keyword.get(options, :__config__)
         operation_id = Keyword.get(options, :__operation_id__)
 
-        Config.emit_event(config, :initial, initial, %{
+        metadata = %{
           operation_id: operation_id,
           has_next: Map.get(initial, :hasNext, false),
           pending_count: length(Map.get(initial, :pending, []))
-        })
+        }
+
+        # Emit telemetry event for instrumentation
+        :telemetry.execute(
+          @telemetry_initial,
+          %{system_time: System.system_time()},
+          Map.merge(metadata, %{response: initial})
+        )
+
+        # Emit to custom on_event callback
+        Config.emit_event(config, :initial, initial, metadata)
 
         send_initial(state, initial)
       end
@@ -213,17 +295,30 @@ defmodule Absinthe.Incremental.Transport do
       defp send_task_result(state, task, result, has_next, config, operation_id, task_started) do
         response = build_task_response(task, result, has_next)
         duration_ms = System.monotonic_time(:millisecond) - task_started
+        success = match?({:ok, _}, result)
 
-        # Emit incremental event
-        Config.emit_event(config, :incremental, response, %{
+        metadata = %{
           operation_id: operation_id,
           path: task.path,
           label: task.label,
           task_type: task.type,
           has_next: has_next,
           duration_ms: duration_ms,
-          success: match?({:ok, _}, result)
-        })
+          success: success
+        }
+
+        # Emit telemetry event for instrumentation
+        :telemetry.execute(
+          @telemetry_payload,
+          %{
+            system_time: System.system_time(),
+            duration: duration_ms * 1_000_000  # Convert to native time units
+          },
+          Map.merge(metadata, %{response: response})
+        )
+
+        # Emit to custom on_event callback
+        Config.emit_event(config, :incremental, response, metadata)
 
         send_incremental(state, response)
       end
@@ -281,22 +376,50 @@ defmodule Absinthe.Incremental.Transport do
       defp emit_complete_event(config, operation_id, started_at) do
         duration_ms = System.monotonic_time(:millisecond) - started_at
 
-        Config.emit_event(config, :complete, %{}, %{
+        metadata = %{
           operation_id: operation_id,
           duration_ms: duration_ms
-        })
+        }
+
+        # Emit telemetry event for instrumentation
+        :telemetry.execute(
+          @telemetry_complete,
+          %{
+            system_time: System.system_time(),
+            duration: duration_ms * 1_000_000  # Convert to native time units
+          },
+          metadata
+        )
+
+        # Emit to custom on_event callback
+        Config.emit_event(config, :complete, %{}, metadata)
       end
 
       defp emit_error_event(config, reason, operation_id, started_at) do
         duration_ms = System.monotonic_time(:millisecond) - started_at
 
-        Config.emit_event(config, :error, %{
+        payload = %{
           reason: reason,
           message: format_error_message(reason)
-        }, %{
+        }
+
+        metadata = %{
           operation_id: operation_id,
           duration_ms: duration_ms
-        })
+        }
+
+        # Emit telemetry event for instrumentation
+        :telemetry.execute(
+          @telemetry_error,
+          %{
+            system_time: System.system_time(),
+            duration: duration_ms * 1_000_000  # Convert to native time units
+          },
+          Map.merge(metadata, %{error: payload})
+        )
+
+        # Emit to custom on_event callback
+        Config.emit_event(config, :error, payload, metadata)
       end
 
       defp format_error_message(:timeout), do: "Operation timed out"
