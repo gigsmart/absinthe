@@ -41,7 +41,10 @@ defmodule Absinthe.Incremental.Config do
     # Monitoring
     enable_telemetry: true,
     enable_logging: true,
-    log_level: :debug
+    log_level: :debug,
+
+    # Event callbacks - for sending events to Sentry, DataDog, etc.
+    on_event: nil  # fn (event_type, payload, metadata) -> :ok end
   }
   
   @type t :: %__MODULE__{
@@ -66,8 +69,35 @@ defmodule Absinthe.Incremental.Config do
     retry_delay_ms: non_neg_integer(),
     enable_telemetry: boolean(),
     enable_logging: boolean(),
-    log_level: atom()
+    log_level: atom(),
+    on_event: event_callback() | nil
   }
+
+  @typedoc """
+  Event callback function for monitoring integrations.
+
+  Called with:
+  - `event_type` - One of `:initial`, `:incremental`, `:complete`, `:error`
+  - `payload` - The event payload (response data, error info, etc.)
+  - `metadata` - Additional context (timing, path, label, operation_id, etc.)
+
+  ## Examples
+
+      # Send to Sentry
+      on_event: fn
+        :error, payload, metadata ->
+          Sentry.capture_message("GraphQL incremental error",
+            extra: %{payload: payload, metadata: metadata}
+          )
+        _, _, _ -> :ok
+      end
+
+      # Send to DataDog
+      on_event: fn event_type, payload, metadata ->
+        Datadog.event("graphql.incremental.\#{event_type}", payload, metadata)
+      end
+  """
+  @type event_callback :: (atom(), map(), map() -> any())
   
   defstruct Map.keys(@default_config)
   
@@ -199,7 +229,61 @@ defmodule Absinthe.Incremental.Config do
   def get(config, key, default \\ nil) do
     Map.get(config, key, default)
   end
-  
+
+  @doc """
+  Emit an event to the configured callback.
+
+  Safely invokes the `on_event` callback if configured. Errors in the callback
+  are caught and logged but do not affect the incremental delivery.
+
+  ## Event Types
+
+  - `:initial` - Initial response with immediately available data
+  - `:incremental` - Deferred or streamed data payload
+  - `:complete` - Stream completed successfully
+  - `:error` - Error occurred during streaming
+
+  ## Metadata
+
+  The metadata map includes:
+  - `:operation_id` - Unique identifier for the operation
+  - `:path` - GraphQL path to the deferred/streamed field
+  - `:label` - Label from @defer or @stream directive
+  - `:started_at` - Timestamp when operation started
+  - `:duration_ms` - Duration in milliseconds (for incremental/complete)
+  - `:task_type` - `:defer` or `:stream`
+
+  ## Examples
+
+      Config.emit_event(config, :initial, response, %{operation_id: "abc123"})
+
+      Config.emit_event(config, :error, error_payload, %{
+        operation_id: "abc123",
+        path: ["user", "posts"],
+        label: "userPosts"
+      })
+  """
+  @spec emit_event(t() | nil, atom(), map(), map()) :: :ok
+  def emit_event(nil, _event_type, _payload, _metadata), do: :ok
+  def emit_event(%__MODULE__{on_event: nil}, _event_type, _payload, _metadata), do: :ok
+
+  def emit_event(%__MODULE__{on_event: callback}, event_type, payload, metadata)
+      when is_function(callback, 3) do
+    try do
+      callback.(event_type, payload, metadata)
+      :ok
+    rescue
+      error ->
+        require Logger
+        Logger.warning(
+          "Incremental delivery on_event callback failed: #{inspect(error)}"
+        )
+        :ok
+    end
+  end
+
+  def emit_event(_config, _event_type, _payload, _metadata), do: :ok
+
   # Private functions
   
   defp validate_transport(errors, %{transport: transport}) do
