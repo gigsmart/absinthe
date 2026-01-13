@@ -38,7 +38,7 @@ defmodule MyApp.Schema do
   use Absinthe.Schema
 
   # Import the draft-spec @defer and @stream directives
-  import_types Absinthe.Type.BuiltIns.IncrementalDirectives
+  import_directives Absinthe.Type.BuiltIns.IncrementalDirectives
 
   query do
     # ...
@@ -495,6 +495,176 @@ Existing queries work without changes. To add incremental delivery:
 3. **Add directives gradually** to minimize risk
 4. **Configure transport** to handle streaming responses
 5. **Add monitoring** to track performance improvements
+
+## Subscriptions with @defer/@stream
+
+Subscriptions support the same `@defer` and `@stream` directives as queries. When a subscription contains deferred content, clients receive multiple payloads:
+
+1. **Initial payload**: Immediately available subscription data
+2. **Incremental payloads**: Deferred/streamed content as it resolves
+
+```graphql
+subscription OnOrderUpdated($orderId: ID!) {
+  orderUpdated(orderId: $orderId) {
+    id
+    status
+
+    # Defer expensive customer lookup
+    ... @defer(label: "customer") {
+      customer {
+        name
+        email
+        loyaltyTier
+      }
+    }
+  }
+}
+```
+
+This is handled automatically by the subscription system. Existing PubSub implementations work unchanged - the same `publish_subscription/2` callback is called multiple times with the standard GraphQL incremental format.
+
+### How It Works
+
+When a mutation triggers a subscription with `@defer`/`@stream`:
+
+1. `Subscription.Local` detects the directives in the subscription document
+2. The `StreamingResolution` phase executes, collecting deferred tasks
+3. `Streaming.Delivery` publishes the initial payload via `pubsub.publish_subscription/2`
+4. Deferred tasks are executed via the configured executor
+5. Each result is published as an incremental payload
+
+```elixir
+# What happens internally (you don't need to do this manually)
+pubsub.publish_subscription(topic, %{
+  data: %{orderUpdated: %{id: "123", status: "SHIPPED"}},
+  pending: [%{id: "0", label: "customer", path: ["orderUpdated"]}],
+  hasNext: true
+})
+
+# Later...
+pubsub.publish_subscription(topic, %{
+  incremental: [%{
+    id: "0",
+    data: %{customer: %{name: "John", email: "john@example.com", loyaltyTier: "GOLD"}}
+  }],
+  hasNext: false
+})
+```
+
+## Custom Executors
+
+By default, deferred and streamed tasks are executed using `Task.async_stream` for in-process concurrent execution. You can implement a custom executor for alternative backends:
+
+- **Oban** - Persistent, retryable job processing
+- **RabbitMQ** - Distributed task queuing
+- **GenStage** - Backpressure-aware pipelines
+- **Custom** - Any execution strategy you need
+
+### Implementing a Custom Executor
+
+Implement the `Absinthe.Streaming.Executor` behaviour:
+
+```elixir
+defmodule MyApp.ObanExecutor do
+  @behaviour Absinthe.Streaming.Executor
+
+  @impl true
+  def execute(tasks, opts) do
+    timeout = Keyword.get(opts, :timeout, 30_000)
+
+    # Queue tasks to Oban and stream results
+    tasks
+    |> Enum.map(&queue_to_oban/1)
+    |> stream_results(timeout)
+  end
+
+  defp queue_to_oban(task) do
+    %{task_id: task.id, execute_fn: task.execute}
+    |> MyApp.DeferredWorker.new()
+    |> Oban.insert!()
+  end
+
+  defp stream_results(jobs, timeout) do
+    # Return an enumerable of results matching this shape:
+    # %{
+    #   task: original_task,
+    #   result: {:ok, data} | {:error, reason},
+    #   has_next: boolean,
+    #   success: boolean,
+    #   duration_ms: integer
+    # }
+    Stream.resource(
+      fn -> {jobs, timeout} end,
+      &poll_next_result/1,
+      fn _ -> :ok end
+    )
+  end
+end
+```
+
+### Configuring a Custom Executor
+
+**Schema-level** (recommended):
+
+```elixir
+defmodule MyApp.Schema do
+  use Absinthe.Schema
+
+  # Use custom executor for all @defer/@stream operations
+  @streaming_executor MyApp.ObanExecutor
+
+  import_directives Absinthe.Type.BuiltIns.IncrementalDirectives
+
+  query do
+    # ...
+  end
+end
+```
+
+**Per-request** (via context):
+
+```elixir
+Absinthe.run(query, MyApp.Schema,
+  context: %{streaming_executor: MyApp.ObanExecutor}
+)
+```
+
+**Application config** (global default):
+
+```elixir
+# config/config.exs
+config :absinthe, :streaming_executor, MyApp.ObanExecutor
+```
+
+### When to Use Custom Executors
+
+| Use Case | Recommended Executor |
+|----------|---------------------|
+| Simple deployments | Default `TaskExecutor` |
+| Long-running deferred operations | Oban (with persistence) |
+| Distributed systems | RabbitMQ or similar |
+| High-throughput with backpressure | GenStage |
+| Retry on failure | Oban |
+
+## Architecture
+
+The streaming system is unified across queries, mutations, and subscriptions:
+
+```
+Absinthe.Streaming
+├── Executor        - Behaviour for pluggable execution backends
+├── TaskExecutor    - Default executor (Task.async_stream)
+└── Delivery        - Handles pubsub delivery for subscriptions
+
+Query/Mutation Path:
+  Request → Pipeline → StreamingResolution → Transport → Client
+
+Subscription Path:
+  Mutation → Subscription.Local → StreamingResolution → Streaming.Delivery
+           → pubsub.publish_subscription/2 (multiple times) → Client
+```
+
+Both paths share the same `Executor` for task execution, ensuring consistent behavior and allowing a single configuration point for custom backends.
 
 ## See Also
 

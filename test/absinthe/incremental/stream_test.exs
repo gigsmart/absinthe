@@ -14,7 +14,7 @@ defmodule Absinthe.Incremental.StreamTest do
   defmodule TestSchema do
     use Absinthe.Schema
 
-    import_types Absinthe.Type.BuiltIns.IncrementalDirectives
+    import_directives Absinthe.Type.BuiltIns.IncrementalDirectives
 
     query do
       field :users, list_of(:user) do

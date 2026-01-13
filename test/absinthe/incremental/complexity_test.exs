@@ -16,7 +16,7 @@ defmodule Absinthe.Incremental.ComplexityTest do
   defmodule TestSchema do
     use Absinthe.Schema
 
-    import_types Absinthe.Type.BuiltIns.IncrementalDirectives
+    import_directives Absinthe.Type.BuiltIns.IncrementalDirectives
 
     query do
       field :user, :user do

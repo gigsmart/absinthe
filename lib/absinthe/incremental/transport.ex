@@ -69,6 +69,7 @@ defmodule Absinthe.Incremental.Transport do
 
   alias Absinthe.Blueprint
   alias Absinthe.Incremental.{Config, Response}
+  alias Absinthe.Streaming.Executor
 
   @type conn_or_socket :: Plug.Conn.t() | Phoenix.Socket.t() | any()
   @type state :: any()
@@ -224,88 +225,56 @@ defmodule Absinthe.Incremental.Transport do
         end
       end
 
-      # Execute tasks using Task.async_stream for controlled concurrency
+      # Execute tasks using configurable executor for controlled concurrency
       defp execute_tasks_with_streaming(state, tasks, timeout, options) do
-        task_count = length(tasks)
         config = Keyword.get(options, :__config__)
         operation_id = Keyword.get(options, :__operation_id__)
         started_at = Keyword.get(options, :__started_at__)
+        schema = Keyword.get(options, :schema)
 
-        # Use Task.async_stream for backpressure and proper supervision
-        results =
-          tasks
-          |> Task.async_stream(
-            fn task ->
-              # Wrap execution with error handling
-              task_started = System.monotonic_time(:millisecond)
-              wrapped_fn = ErrorHandler.wrap_streaming_task(task.execute)
-              {task, wrapped_fn.(), task_started}
-            end,
-            timeout: timeout,
-            on_timeout: :kill_task,
-            max_concurrency: System.schedulers_online() * 2
-          )
-          |> Enum.with_index()
-          |> Enum.reduce_while({:ok, state}, fn
-            {{:ok, {task, result, task_started}}, index}, {:ok, acc_state} ->
-              has_next = index < task_count - 1
+        # Get configurable executor (defaults to TaskExecutor)
+        executor = Absinthe.Streaming.Executor.get_executor(schema, options)
+        executor_opts = [
+          timeout: timeout,
+          max_concurrency: System.schedulers_online() * 2
+        ]
 
-              case send_task_result(
+        tasks
+        |> executor.execute(executor_opts)
+        |> Enum.reduce_while({:ok, state}, fn task_result, {:ok, acc_state} ->
+          case task_result.success do
+            true ->
+              case send_task_result_from_executor(
                      acc_state,
-                     task,
-                     result,
-                     has_next,
+                     task_result,
                      config,
-                     operation_id,
-                     task_started
+                     operation_id
                    ) do
                 {:ok, new_state} -> {:cont, {:ok, new_state}}
                 {:error, _} = error -> {:halt, error}
               end
 
-            {{:exit, :timeout}, _index}, {:ok, acc_state} ->
-              # Handle timeout - send error response and continue
-              error_response =
-                Response.build_error(
-                  [%{message: "Operation timed out"}],
-                  [],
-                  nil,
-                  false
-                )
-
-              emit_error_event(config, :timeout, operation_id, started_at)
+            false ->
+              # Handle errors (timeout, exit, etc.)
+              error_response = build_error_response_from_executor(task_result)
+              emit_error_event(config, task_result.result, operation_id, started_at)
 
               case send_incremental(acc_state, error_response) do
                 {:ok, new_state} -> {:cont, {:ok, new_state}}
                 error -> {:halt, error}
               end
-
-            {{:exit, reason}, _index}, {:ok, acc_state} ->
-              # Handle other exits
-              error_response =
-                Response.build_error(
-                  [%{message: "Operation failed: #{inspect(reason)}"}],
-                  [],
-                  nil,
-                  false
-                )
-
-              emit_error_event(config, reason, operation_id, started_at)
-
-              case send_incremental(acc_state, error_response) do
-                {:ok, new_state} -> {:cont, {:ok, new_state}}
-                error -> {:halt, error}
-              end
-          end)
-
-        results
+          end
+        end)
       end
 
-      # Send the result of a single task
-      defp send_task_result(state, task, result, has_next, config, operation_id, task_started) do
+      # Send task result from TaskExecutor output
+      defp send_task_result_from_executor(state, task_result, config, operation_id) do
+        task = task_result.task
+        result = task_result.result
+        has_next = task_result.has_next
+        duration_ms = task_result.duration_ms
+
         response = build_task_response(task, result, has_next)
-        duration_ms = System.monotonic_time(:millisecond) - task_started
-        success = match?({:ok, _}, result)
 
         metadata = %{
           operation_id: operation_id,
@@ -314,7 +283,7 @@ defmodule Absinthe.Incremental.Transport do
           task_type: task.type,
           has_next: has_next,
           duration_ms: duration_ms,
-          success: success
+          success: true
         }
 
         # Emit telemetry event for instrumentation
@@ -322,7 +291,6 @@ defmodule Absinthe.Incremental.Transport do
           @telemetry_payload,
           %{
             system_time: System.system_time(),
-            # Convert to native time units
             duration: duration_ms * 1_000_000
           },
           Map.merge(metadata, %{response: response})
@@ -332,6 +300,24 @@ defmodule Absinthe.Incremental.Transport do
         Config.emit_event(config, :incremental, response, metadata)
 
         send_incremental(state, response)
+      end
+
+      # Build error response from TaskExecutor result
+      defp build_error_response_from_executor(task_result) do
+        error_message =
+          case task_result.result do
+            {:error, :timeout} -> "Operation timed out"
+            {:error, {:exit, reason}} -> "Operation failed: #{inspect(reason)}"
+            {:error, msg} when is_binary(msg) -> msg
+            {:error, other} -> inspect(other)
+          end
+
+        Response.build_error(
+          [%{message: error_message}],
+          (task_result.task && task_result.task.path) || [],
+          task_result.task && task_result.task.label,
+          task_result.has_next
+        )
       end
 
       # Build the appropriate response based on task type and result
@@ -491,6 +477,7 @@ defmodule Absinthe.Incremental.Transport do
   @spec collect_all(Blueprint.t(), Keyword.t()) :: {:ok, map()} | {:error, term()}
   def collect_all(blueprint, options \\ []) do
     timeout = Keyword.get(options, :timeout, @default_timeout)
+    schema = Keyword.get(options, :schema)
     streaming_context = get_streaming_context(blueprint)
 
     initial = Response.build_initial(blueprint)
@@ -499,34 +486,41 @@ defmodule Absinthe.Incremental.Transport do
       Map.get(streaming_context, :deferred_tasks, []) ++
         Map.get(streaming_context, :stream_tasks, [])
 
+    # Use configurable executor (defaults to TaskExecutor)
+    executor = Executor.get_executor(schema, options)
     incremental_results =
       all_tasks
-      |> Task.async_stream(
-        fn task -> {task, task.execute.()} end,
-        timeout: timeout,
-        on_timeout: :kill_task
-      )
-      |> Enum.map(fn
-        {:ok, {task, {:ok, result}}} ->
-          %{
-            type: task.type,
-            label: task.label,
-            path: task.path,
-            data: Map.get(result, :data),
-            items: Map.get(result, :items),
-            errors: Map.get(result, :errors)
-          }
+      |> executor.execute(timeout: timeout)
+      |> Enum.map(fn task_result ->
+        task = task_result.task
 
-        {:ok, {task, {:error, error}}} ->
-          %{
-            type: task.type,
-            label: task.label,
-            path: task.path,
-            errors: [error]
-          }
+        case task_result.result do
+          {:ok, result} ->
+            %{
+              type: task.type,
+              label: task.label,
+              path: task.path,
+              data: Map.get(result, :data),
+              items: Map.get(result, :items),
+              errors: Map.get(result, :errors)
+            }
 
-        {:exit, reason} ->
-          %{errors: [%{message: "Task failed: #{inspect(reason)}"}]}
+          {:error, error} ->
+            error_msg =
+              case error do
+                :timeout -> "Operation timed out"
+                {:exit, reason} -> "Task failed: #{inspect(reason)}"
+                msg when is_binary(msg) -> msg
+                other -> inspect(other)
+              end
+
+            %{
+              type: task && task.type,
+              label: task && task.label,
+              path: task && task.path,
+              errors: [%{message: error_msg}]
+            }
+        end
       end)
 
     {:ok,

@@ -12,7 +12,7 @@ defmodule Absinthe.Type.BuiltIns.IncrementalDirectives do
       defmodule MyApp.Schema do
         use Absinthe.Schema
 
-        import_types Absinthe.Type.BuiltIns.IncrementalDirectives
+        import_directives Absinthe.Type.BuiltIns.IncrementalDirectives
 
         query do
           # ...
