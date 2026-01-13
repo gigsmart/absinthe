@@ -1,5 +1,7 @@
 # Incremental Delivery
 
+> **Note:** The `@defer` and `@stream` directives are currently in draft/RFC stage and not yet part of the finalized GraphQL specification. The implementation follows the [Incremental Delivery RFC](https://github.com/graphql/graphql-spec/blob/main/rfcs/DeferStream.md) and may change as the specification evolves.
+
 GraphQL's incremental delivery allows responses to be sent in multiple parts, reducing initial response time and improving user experience. Absinthe supports this through the `@defer` and `@stream` directives.
 
 ## Overview
@@ -480,4 +482,4 @@ Existing queries work without changes. To add incremental delivery:
 - [Subscriptions](subscriptions.md) for real-time data
 - [Dataloader](dataloader.md) for efficient data fetching
 - [Telemetry](telemetry.md) for observability
-- [GraphQL Incremental Delivery Spec](https://graphql.org/blog/2020-12-08-defer-stream)
+- [GraphQL Incremental Delivery RFC](https://github.com/graphql/graphql-spec/blob/main/rfcs/DeferStream.md)

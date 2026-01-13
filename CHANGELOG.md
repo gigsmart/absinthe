@@ -4,7 +4,8 @@
 
 ### Features
 
-* **spec:** Add `@defer` and `@stream` directives for incremental delivery ([#1377](https://github.com/absinthe-graphql/absinthe/pull/1377))
+* **draft-spec:** Add `@defer` and `@stream` directives for incremental delivery ([#1377](https://github.com/absinthe-graphql/absinthe/pull/1377))
+  - **Note:** These directives are still in draft/RFC stage and not yet part of the finalized GraphQL specification
   - Split GraphQL responses into initial + incremental payloads
   - Configure via `Absinthe.Pipeline.Incremental.enable/2`
   - Resource limits (max concurrent streams, memory, duration)
