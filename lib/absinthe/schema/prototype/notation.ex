@@ -62,34 +62,6 @@ defmodule Absinthe.Schema.Prototype.Notation do
         end)
       end
 
-      # https://github.com/graphql/nullability-wg
-      directive :semantic_non_null do
-        description """
-        Indicates that a field is semantically non-null: the resolver never intentionally returns null,
-        but null may still be returned due to errors.
-
-        This decouples nullability from error handling, allowing clients to understand which fields
-        may be null only due to errors versus fields that may intentionally be null.
-        """
-
-        arg :levels, non_null(list_of(non_null(:integer))),
-          default_value: [0],
-          description: """
-          Specifies which levels of the return type are semantically non-null.
-          - [0] means the field itself is semantically non-null
-          - [1] for list fields means the list items are semantically non-null
-          - [0, 1] means both the field and its items are semantically non-null
-          """
-
-        repeatable false
-        on [:field_definition]
-
-        expand(fn args, node ->
-          levels = Map.get(args, :levels, [0])
-          %{node | __private__: Keyword.put(node.__private__, :semantic_non_null, levels)}
-        end)
-      end
-
       def pipeline(pipeline) do
         pipeline
         |> Absinthe.Pipeline.without(Absinthe.Phase.Schema.Validation.QueryTypeMustBeObject)

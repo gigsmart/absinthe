@@ -6,6 +6,8 @@ defmodule Absinthe.Type.SemanticNullabilityTest do
   defmodule TestSchema do
     use Absinthe.Schema
 
+    import_types Absinthe.Type.BuiltIns.SemanticNonNull
+
     object :post do
       field :id, :id
       field :title, :string
