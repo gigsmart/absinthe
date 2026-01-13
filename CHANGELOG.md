@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* **spec:** Add `@defer` and `@stream` directives for incremental delivery ([#1377](https://github.com/absinthe-graphql/absinthe/pull/1377))
+  - Split GraphQL responses into initial + incremental payloads
+  - Configure via `Absinthe.Pipeline.Incremental.enable/2`
+  - Resource limits (max concurrent streams, memory, duration)
+  - Dataloader integration for batched loading
+  - SSE and WebSocket transport support
+* **telemetry:** Add telemetry events for incremental delivery
+  - `[:absinthe, :incremental, :delivery, :initial]` - initial response
+  - `[:absinthe, :incremental, :delivery, :payload]` - each deferred/streamed payload
+  - `[:absinthe, :incremental, :delivery, :complete]` - stream completed
+  - `[:absinthe, :incremental, :delivery, :error]` - error during streaming
+* **monitoring:** Add `on_event` callback for custom monitoring integrations (Sentry, DataDog)
+
 ## [1.9.0](https://github.com/absinthe-graphql/absinthe/compare/v1.8.0...v1.9.0) (2025-11-21)
 
 
