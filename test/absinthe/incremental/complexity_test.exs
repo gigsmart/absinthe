@@ -16,6 +16,8 @@ defmodule Absinthe.Incremental.ComplexityTest do
   defmodule TestSchema do
     use Absinthe.Schema
 
+    import_types Absinthe.Type.BuiltIns.IncrementalDirectives
+
     query do
       field :user, :user do
         resolve fn _, _ -> {:ok, %{id: "1", name: "Test User"}} end

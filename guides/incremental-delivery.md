@@ -29,6 +29,25 @@ def deps do
 end
 ```
 
+## Schema Setup
+
+Since `@defer` and `@stream` are draft-spec features, you must explicitly opt-in by importing the directives in your schema:
+
+```elixir
+defmodule MyApp.Schema do
+  use Absinthe.Schema
+
+  # Import the draft-spec @defer and @stream directives
+  import_types Absinthe.Type.BuiltIns.IncrementalDirectives
+
+  query do
+    # ...
+  end
+end
+```
+
+Without this import, the `@defer` and `@stream` directives will not be available in your schema.
+
 ## Basic Usage
 
 ### The @defer Directive
