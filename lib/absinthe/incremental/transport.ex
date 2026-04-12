@@ -71,7 +71,9 @@ defmodule Absinthe.Incremental.Transport do
   alias Absinthe.Incremental.{Config, Response}
   alias Absinthe.Streaming.Executor
 
-  @type conn_or_socket :: Plug.Conn.t() | Phoenix.Socket.t() | any()
+  # Plug.Conn.t() | Phoenix.Socket.t() — optional dependencies, kept as any()
+  # so this module can be used without Plug or Phoenix.
+  @type conn_or_socket :: any()
   @type state :: any()
   @type response :: map()
 

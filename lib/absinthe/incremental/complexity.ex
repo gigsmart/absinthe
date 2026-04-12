@@ -368,7 +368,7 @@ defmodule Absinthe.Incremental.Complexity do
     end
   end
 
-  defp analyze_node(%Blueprint.Document.Fragment.Spread{} = node, schema, config, analysis, depth) do
+  defp analyze_node(%Blueprint.Document.Fragment.Spread{} = node, _schema, config, analysis, depth) do
     {analysis, _in_defer} = check_defer_directive(node, config, analysis, depth)
     # Would need to look up the fragment definition for full analysis
     analysis

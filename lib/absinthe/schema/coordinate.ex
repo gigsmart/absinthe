@@ -301,24 +301,6 @@ defmodule Absinthe.Schema.Coordinate do
     end
   end
 
-  defp resolve_parsed(schema, {:enum_value, enum_name, value_name}, coordinate) do
-    with {:ok, enum_type} <- resolve_parsed(schema, {:type, enum_name}, enum_name),
-         {:ok, value} <- get_enum_value(enum_type, value_name) do
-      {:ok, value}
-    else
-      {:error, _} -> {:error, "Enum value not found: #{coordinate}"}
-    end
-  end
-
-  defp resolve_parsed(schema, {:input_field, type_name, field_name}, coordinate) do
-    with {:ok, input_type} <- resolve_parsed(schema, {:type, type_name}, type_name),
-         {:ok, field} <- get_input_field(input_type, field_name) do
-      {:ok, field}
-    else
-      {:error, _} -> {:error, "Input field not found: #{coordinate}"}
-    end
-  end
-
   defp resolve_parsed(schema, {:directive, directive_name}, coordinate) do
     case lookup_directive_by_name(schema, directive_name) do
       nil -> {:error, "Directive not found: #{coordinate}"}
@@ -394,39 +376,6 @@ defmodule Absinthe.Schema.Coordinate do
   end
 
   defp get_argument(_, _), do: {:error, :not_found}
-
-  defp get_enum_value(%Absinthe.Type.Enum{values: values}, value_name) when is_map(values) do
-    result =
-      Enum.find_value(values, fn {_, value} ->
-        if value.name == value_name || Atom.to_string(value.value) == value_name do
-          value
-        end
-      end)
-
-    case result do
-      nil -> {:error, :not_found}
-      value -> {:ok, value}
-    end
-  end
-
-  defp get_enum_value(_, _), do: {:error, :not_found}
-
-  defp get_input_field(%Absinthe.Type.InputObject{fields: fields}, field_name)
-       when is_map(fields) do
-    result =
-      Enum.find_value(fields, fn {_, field} ->
-        if field.name == field_name || Atom.to_string(field.identifier) == field_name do
-          field
-        end
-      end)
-
-    case result do
-      nil -> {:error, :not_found}
-      field -> {:ok, field}
-    end
-  end
-
-  defp get_input_field(_, _), do: {:error, :not_found}
 
   defp get_directive_argument(%{args: args}, arg_name) when is_map(args) do
     result =
