@@ -209,6 +209,21 @@ defmodule Absinthe.Schema.Notation.SDL.Render do
   end
 
   # 2-arity render functions
+  defp render(%Blueprint.Schema.DirectiveDefinition{} = directive, type_definitions) do
+    locations = directive.locations |> Enum.map(&String.upcase(to_string(&1)))
+
+    concat([
+      "directive ",
+      "@",
+      string(Absinthe.Utils.camelize(directive.name, lower: true)),
+      arguments(directive.arguments, type_definitions),
+      repeatable(directive.repeatable),
+      " on ",
+      join(locations, " | ")
+    ])
+    |> description(directive.description)
+  end
+
   defp render(%Blueprint.Directive{} = directive, type_definitions) do
     concat([
       " @",
