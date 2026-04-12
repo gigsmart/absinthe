@@ -258,6 +258,16 @@ defmodule Absinthe.Incremental.ResourceManager do
     update_in(state.stream_stats.total_count, &(&1 + 1))
   end
 
+  defp update_stats(state, :stream_timeout) do
+    state
+    |> update_in([:stream_stats, :timeout_count], &(&1 + 1))
+    |> update_in([:stream_stats, :failed_count], &(&1 + 1))
+  end
+
+  defp update_stats(state, :stream_crashed) do
+    update_in(state.stream_stats.failed_count, &(&1 + 1))
+  end
+
   defp update_stats(state, :stream_released, duration) do
     state
     |> update_in([:stream_stats, :completed_count], &(&1 + 1))
@@ -267,16 +277,6 @@ defmodule Absinthe.Incremental.ResourceManager do
       nil -> duration
       min -> min(min, duration)
     end)
-  end
-
-  defp update_stats(state, :stream_timeout) do
-    state
-    |> update_in([:stream_stats, :timeout_count], &(&1 + 1))
-    |> update_in([:stream_stats, :failed_count], &(&1 + 1))
-  end
-
-  defp update_stats(state, :stream_crashed) do
-    update_in(state.stream_stats.failed_count, &(&1 + 1))
   end
 
   defp schedule_stream_timeout(operation_id, timeout_ms) do

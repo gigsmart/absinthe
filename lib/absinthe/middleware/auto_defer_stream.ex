@@ -334,7 +334,7 @@ defmodule Absinthe.Middleware.AutoDeferStream do
     }
   end
 
-  defp apply_defer(resolution, config) do
+  defp apply_defer(resolution, _config) do
     # Add defer flag to the field
     field =
       put_in(

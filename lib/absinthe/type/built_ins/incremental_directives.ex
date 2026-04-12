@@ -42,8 +42,6 @@ defmodule Absinthe.Type.BuiltIns.IncrementalDirectives do
 
   use Absinthe.Schema.Notation
 
-  alias Absinthe.Blueprint
-
   directive :defer do
     description """
     Directs the executor to defer this fragment spread or inline fragment,
@@ -76,7 +74,7 @@ defmodule Absinthe.Type.BuiltIns.IncrementalDirectives do
           enabled: true
         }
 
-        Blueprint.put_flag(node, :defer, defer_config)
+        update_in(node.flags, &Map.put(&1, :defer, defer_config))
     end
   end
 
@@ -116,7 +114,7 @@ defmodule Absinthe.Type.BuiltIns.IncrementalDirectives do
           enabled: true
         }
 
-        Blueprint.put_flag(node, :stream, stream_config)
+        update_in(node.flags, &Map.put(&1, :stream, stream_config))
     end
   end
 end

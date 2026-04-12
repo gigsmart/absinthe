@@ -154,10 +154,11 @@ defmodule Absinthe.Schema.TypesystemDirectivesTest do
         arg :query, non_null(:string)
 
         resolve fn _, _ ->
-          {:ok, [
-            %{id: "1", name: "Test User", type: :user},
-            %{id: "2", title: "Test Post", type: :post}
-          ]}
+          {:ok,
+           [
+             %{id: "1", name: "Test User", type: :user},
+             %{id: "2", title: "Test Post", type: :post}
+           ]}
         end
       end
     end
@@ -480,7 +481,11 @@ defmodule Absinthe.Schema.TypesystemDirectivesTest do
       applied = name_field["appliedDirectives"]
       feature = Enum.find(applied, &(&1["name"] == "feature"))
       assert feature != nil
-      assert Enum.find(feature["args"], &(&1["name"] == "name" && &1["value"] == "\"user_name_field\""))
+
+      assert Enum.find(
+               feature["args"],
+               &(&1["name"] == "name" && &1["value"] == "\"user_name_field\"")
+             )
     end
 
     test "introspection shows applied directives on enum values" do
@@ -545,7 +550,11 @@ defmodule Absinthe.Schema.TypesystemDirectivesTest do
       applied = format_arg["appliedDirectives"]
       feature = Enum.find(applied, &(&1["name"] == "feature"))
       assert feature != nil
-      assert Enum.find(feature["args"], &(&1["name"] == "name" && &1["value"] == "\"format_arg\""))
+
+      assert Enum.find(
+               feature["args"],
+               &(&1["name"] == "name" && &1["value"] == "\"format_arg\"")
+             )
     end
 
     test "introspection shows applied directives on input object fields" do
@@ -575,7 +584,11 @@ defmodule Absinthe.Schema.TypesystemDirectivesTest do
       applied = name_field["appliedDirectives"]
       feature = Enum.find(applied, &(&1["name"] == "feature"))
       assert feature != nil
-      assert Enum.find(feature["args"], &(&1["name"] == "name" && &1["value"] == "\"name_input_field\""))
+
+      assert Enum.find(
+               feature["args"],
+               &(&1["name"] == "name" && &1["value"] == "\"name_input_field\"")
+             )
     end
   end
 end

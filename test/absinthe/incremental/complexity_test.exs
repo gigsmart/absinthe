@@ -10,7 +10,7 @@ defmodule Absinthe.Incremental.ComplexityTest do
 
   use ExUnit.Case, async: true
 
-  alias Absinthe.{Pipeline, Blueprint}
+  alias Absinthe.Pipeline
   alias Absinthe.Incremental.Complexity
 
   defmodule TestSchema do
