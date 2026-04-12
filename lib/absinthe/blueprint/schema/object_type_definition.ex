@@ -103,34 +103,51 @@ defmodule Absinthe.Blueprint.Schema.ObjectTypeDefinition do
     Enum.map(directives, fn directive ->
       %{
         name: directive.name,
-        args: Enum.map(directive.arguments, fn arg ->
-          %{
-            name: arg.name,
-            value: serialize_argument_value(arg.input_value)
-          }
-        end)
+        args:
+          Enum.map(directive.arguments, fn arg ->
+            %{
+              name: arg.name,
+              value: serialize_argument_value(arg.input_value)
+            }
+          end)
       }
     end)
   end
 
   def build_applied_directives(_), do: []
 
-  defp serialize_argument_value(%Absinthe.Blueprint.Input.String{value: value}), do: inspect(value)
-  defp serialize_argument_value(%Absinthe.Blueprint.Input.Integer{value: value}), do: to_string(value)
-  defp serialize_argument_value(%Absinthe.Blueprint.Input.Float{value: value}), do: to_string(value)
-  defp serialize_argument_value(%Absinthe.Blueprint.Input.Boolean{value: value}), do: to_string(value)
+  defp serialize_argument_value(%Absinthe.Blueprint.Input.String{value: value}),
+    do: inspect(value)
+
+  defp serialize_argument_value(%Absinthe.Blueprint.Input.Integer{value: value}),
+    do: to_string(value)
+
+  defp serialize_argument_value(%Absinthe.Blueprint.Input.Float{value: value}),
+    do: to_string(value)
+
+  defp serialize_argument_value(%Absinthe.Blueprint.Input.Boolean{value: value}),
+    do: to_string(value)
+
   defp serialize_argument_value(%Absinthe.Blueprint.Input.Null{}), do: "null"
   defp serialize_argument_value(%Absinthe.Blueprint.Input.Enum{value: value}), do: value
+
   defp serialize_argument_value(%Absinthe.Blueprint.Input.List{items: items}) do
     "[" <> Enum.map_join(items, ", ", &serialize_argument_value/1) <> "]"
   end
+
   defp serialize_argument_value(%Absinthe.Blueprint.Input.Object{fields: fields}) do
-    "{" <> Enum.map_join(fields, ", ", fn field ->
-      "#{field.name}: #{serialize_argument_value(field.input_value)}"
-    end) <> "}"
+    "{" <>
+      Enum.map_join(fields, ", ", fn field ->
+        "#{field.name}: #{serialize_argument_value(field.input_value)}"
+      end) <> "}"
   end
-  defp serialize_argument_value(%Absinthe.Blueprint.Input.RawValue{content: content}), do: serialize_argument_value(content)
-  defp serialize_argument_value(%Absinthe.Blueprint.Input.Value{raw: raw}), do: serialize_argument_value(raw)
+
+  defp serialize_argument_value(%Absinthe.Blueprint.Input.RawValue{content: content}),
+    do: serialize_argument_value(content)
+
+  defp serialize_argument_value(%Absinthe.Blueprint.Input.Value{raw: raw}),
+    do: serialize_argument_value(raw)
+
   defp serialize_argument_value(value), do: inspect(value)
 
   defimpl Inspect do

@@ -21,7 +21,8 @@ defmodule Absinthe.Schema.Coordinate.ErrorHelpersTest do
     end
 
     test "generates directive argument coordinate" do
-      assert ErrorHelpers.coordinate_for(:directive, "deprecated", "reason") == "@deprecated(reason:)"
+      assert ErrorHelpers.coordinate_for(:directive, "deprecated", "reason") ==
+               "@deprecated(reason:)"
     end
   end
 

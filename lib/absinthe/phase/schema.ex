@@ -98,7 +98,13 @@ defmodule Absinthe.Phase.Schema do
     %{node | schema_node: schema_node, type_condition: %{condition | schema_node: schema_node}}
   end
 
-  defp set_schema_node(%Blueprint.Directive{name: name} = node, _parent, schema, adapter, blueprint_directives) do
+  defp set_schema_node(
+         %Blueprint.Directive{name: name} = node,
+         _parent,
+         schema,
+         adapter,
+         blueprint_directives
+       ) do
     %{node | schema_node: find_schema_directive(name, schema, adapter, blueprint_directives)}
   end
 
@@ -168,11 +174,23 @@ defmodule Absinthe.Phase.Schema do
     )
   end
 
-  defp set_schema_node(%Blueprint.Document.Field{} = node, parent, schema, adapter, _blueprint_directives) do
+  defp set_schema_node(
+         %Blueprint.Document.Field{} = node,
+         parent,
+         schema,
+         adapter,
+         _blueprint_directives
+       ) do
     %{node | schema_node: find_schema_field(parent.schema_node, node.name, schema, adapter)}
   end
 
-  defp set_schema_node(%Blueprint.Input.Argument{name: name} = node, parent, _schema, adapter, _blueprint_directives) do
+  defp set_schema_node(
+         %Blueprint.Input.Argument{name: name} = node,
+         parent,
+         _schema,
+         adapter,
+         _blueprint_directives
+       ) do
     schema_node = find_schema_argument(parent.schema_node, name, adapter)
     %{node | schema_node: schema_node}
   end
@@ -181,7 +199,13 @@ defmodule Absinthe.Phase.Schema do
     node
   end
 
-  defp set_schema_node(%Blueprint.Input.Field{} = node, parent, schema, adapter, _blueprint_directives) do
+  defp set_schema_node(
+         %Blueprint.Input.Field{} = node,
+         parent,
+         schema,
+         adapter,
+         _blueprint_directives
+       ) do
     case node.name do
       "__" <> _ ->
         %{node | schema_node: nil}
@@ -191,7 +215,13 @@ defmodule Absinthe.Phase.Schema do
     end
   end
 
-  defp set_schema_node(%Blueprint.Input.List{} = node, parent, _schema, _adapter, _blueprint_directives) do
+  defp set_schema_node(
+         %Blueprint.Input.List{} = node,
+         parent,
+         _schema,
+         _adapter,
+         _blueprint_directives
+       ) do
     case Type.unwrap_non_null(parent.schema_node) do
       %{of_type: internal_type} ->
         %{node | schema_node: internal_type}
@@ -214,7 +244,13 @@ defmodule Absinthe.Phase.Schema do
     end
   end
 
-  defp set_schema_node(%{schema_node: nil} = node, %Blueprint.Input.Value{} = parent, _schema, _, _blueprint_directives) do
+  defp set_schema_node(
+         %{schema_node: nil} = node,
+         %Blueprint.Input.Value{} = parent,
+         _schema,
+         _,
+         _blueprint_directives
+       ) do
     %{node | schema_node: parent.schema_node}
   end
 

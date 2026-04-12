@@ -33,7 +33,9 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
             stream_tasks: []
           }
 
-          updated_context = Map.put(blueprint.execution.context, :__streaming__, streaming_context)
+          updated_context =
+            Map.put(blueprint.execution.context, :__streaming__, streaming_context)
+
           updated_execution = %{blueprint.execution | context: updated_context}
           updated_execution = Map.put(updated_execution, :incremental_delivery, true)
 
@@ -56,9 +58,14 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
   defp walk_selections(selections, parent_path, blueprint) when is_list(selections) do
     Enum.flat_map(selections, fn sel -> walk_selection(sel, parent_path, blueprint) end)
   end
+
   defp walk_selections(_, _, _blueprint), do: []
 
-  defp walk_selection(%Blueprint.Document.Field{name: name, selections: sels}, parent_path, blueprint) do
+  defp walk_selection(
+         %Blueprint.Document.Field{name: name, selections: sels},
+         parent_path,
+         blueprint
+       ) do
     walk_selections(sels, parent_path ++ [name], blueprint)
   end
 
@@ -78,7 +85,11 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
     ]
   end
 
-  defp walk_selection(%Blueprint.Document.Fragment.Inline{selections: sels}, parent_path, blueprint) do
+  defp walk_selection(
+         %Blueprint.Document.Fragment.Inline{selections: sels},
+         parent_path,
+         blueprint
+       ) do
     walk_selections(sels, parent_path, blueprint)
   end
 
@@ -111,9 +122,11 @@ defmodule Absinthe.Phase.Document.Execution.StreamingResolution do
   defp walk_selection(_, _parent_path, _blueprint), do: []
 
   defp extract_field_names(%Blueprint.Document.Field{name: name}), do: [name]
+
   defp extract_field_names(%{selections: sels}) when is_list(sels) do
     Enum.flat_map(sels, &extract_field_names/1)
   end
+
   defp extract_field_names(_), do: []
 
   defp generate_operation_id do

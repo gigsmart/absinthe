@@ -260,7 +260,9 @@ defmodule Absinthe.Lexer do
       {:error, message, _rest, _context, {line, line_offset}, byte_offset}
       when is_binary(message) ->
         byte_column = byte_offset - line_offset + 1
-        {:error, :invalid_unicode_escape, message, byte_loc_to_char_loc({line, byte_column}, lines)}
+
+        {:error, :invalid_unicode_escape, message,
+         byte_loc_to_char_loc({line, byte_column}, lines)}
 
       {:ok, tokens, "", _, _, _} ->
         tokens = convert_token_columns_from_byte_to_char(tokens, lines)
@@ -399,7 +401,7 @@ defmodule Absinthe.Lexer do
 
   # Decode a surrogate pair to a Unicode scalar value
   defp decode_surrogate_pair(high, low) do
-    0x10000 + ((high - 0xD800) * 0x400) + (low - 0xDC00)
+    0x10000 + (high - 0xD800) * 0x400 + (low - 0xDC00)
   end
 
   # Variable-width Unicode escape: \u{XXXXXX}

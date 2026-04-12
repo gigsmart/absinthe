@@ -292,7 +292,8 @@ defmodule Absinthe.Schema.Coordinate do
   end
 
   defp resolve_parsed(schema, {:argument, type_name, field_name, arg_name}, coordinate) do
-    with {:ok, field} <- resolve_parsed(schema, {:field, type_name, field_name}, "#{type_name}.#{field_name}"),
+    with {:ok, field} <-
+           resolve_parsed(schema, {:field, type_name, field_name}, "#{type_name}.#{field_name}"),
          {:ok, arg} <- get_argument(field, arg_name) do
       {:ok, arg}
     else
@@ -326,7 +327,8 @@ defmodule Absinthe.Schema.Coordinate do
   end
 
   defp resolve_parsed(schema, {:directive_argument, directive_name, arg_name}, coordinate) do
-    with {:ok, directive} <- resolve_parsed(schema, {:directive, directive_name}, "@#{directive_name}"),
+    with {:ok, directive} <-
+           resolve_parsed(schema, {:directive, directive_name}, "@#{directive_name}"),
          {:ok, arg} <- get_directive_argument(directive, arg_name) do
       {:ok, arg}
     else
@@ -409,7 +411,8 @@ defmodule Absinthe.Schema.Coordinate do
 
   defp get_enum_value(_, _), do: {:error, :not_found}
 
-  defp get_input_field(%Absinthe.Type.InputObject{fields: fields}, field_name) when is_map(fields) do
+  defp get_input_field(%Absinthe.Type.InputObject{fields: fields}, field_name)
+       when is_map(fields) do
     result =
       Enum.find_value(fields, fn {_, field} ->
         if field.name == field_name || Atom.to_string(field.identifier) == field_name do
