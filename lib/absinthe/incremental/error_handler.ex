@@ -6,7 +6,6 @@ defmodule Absinthe.Incremental.ErrorHandler do
   streaming operations, ensuring robust behavior even when things go wrong.
   """
 
-  alias Absinthe.Incremental.Response
   require Logger
 
   @type error_type ::
@@ -315,18 +314,11 @@ defmodule Absinthe.Incremental.ErrorHandler do
     }
   end
 
-  defp format_exception(exception, stacktrace \\ nil) do
-    formatted_stacktrace =
-      if stacktrace do
-        Exception.format_stacktrace(stacktrace)
-      else
-        "stacktrace not available"
-      end
-
+  defp format_exception(exception, stacktrace) do
     %{
       message: Exception.message(exception),
       type: exception.__struct__,
-      stacktrace: formatted_stacktrace
+      stacktrace: Exception.format_stacktrace(stacktrace)
     }
   end
 

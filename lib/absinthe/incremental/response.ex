@@ -8,34 +8,35 @@ defmodule Absinthe.Incremental.Response do
   alias Absinthe.Blueprint
 
   @type initial_response :: %{
-          data: map(),
-          pending: list(pending_item()),
-          hasNext: boolean(),
-          errors: list(map()) | nil
+          required(:data) => map(),
+          required(:pending) => [pending_item()],
+          required(:hasNext) => boolean(),
+          optional(:errors) => [map()]
         }
 
   @type incremental_response :: %{
-          incremental: list(incremental_item()),
-          hasNext: boolean(),
-          completed: list(completed_item()) | nil
+          required(:hasNext) => boolean(),
+          optional(:incremental) => [incremental_item()],
+          optional(:completed) => [completed_item()]
         }
 
   @type pending_item :: %{
-          id: String.t(),
-          path: list(String.t() | integer()),
-          label: String.t() | nil
+          required(:id) => String.t(),
+          required(:path) => [String.t() | integer()],
+          optional(:label) => String.t()
         }
 
   @type incremental_item :: %{
-          data: any(),
-          path: list(String.t() | integer()),
-          label: String.t() | nil,
-          errors: list(map()) | nil
+          optional(:data) => any(),
+          optional(:items) => [any()],
+          required(:path) => [String.t() | integer()],
+          optional(:label) => String.t(),
+          optional(:errors) => [map()]
         }
 
   @type completed_item :: %{
-          id: String.t(),
-          errors: list(map()) | nil
+          required(:id) => String.t(),
+          optional(:errors) => [map()]
         }
 
   @doc """
@@ -72,7 +73,7 @@ defmodule Absinthe.Incremental.Response do
   - A hasNext flag indicating if more payloads are coming
   - Optional completed items to signal completion of specific operations
   """
-  @spec build_incremental(any(), list(), String.t() | nil, boolean()) :: incremental_response()
+  @spec build_incremental(any(), [any()], String.t() | nil, boolean()) :: incremental_response()
   def build_incremental(data, path, label, has_next) do
     incremental_item = %{
       data: data,
@@ -95,7 +96,7 @@ defmodule Absinthe.Incremental.Response do
   @doc """
   Build an incremental response for streamed list items.
   """
-  @spec build_stream_incremental(list(), list(), String.t() | nil, boolean()) ::
+  @spec build_stream_incremental([any()], [any()], String.t() | nil, boolean()) ::
           incremental_response()
   def build_stream_incremental(items, path, label, has_next) do
     incremental_item = %{
@@ -119,7 +120,7 @@ defmodule Absinthe.Incremental.Response do
   @doc """
   Build a completion response to signal the end of incremental delivery.
   """
-  @spec build_completed(list(String.t())) :: incremental_response()
+  @spec build_completed([String.t()]) :: incremental_response()
   def build_completed(completed_ids) do
     completed_items =
       Enum.map(completed_ids, fn id ->
@@ -135,7 +136,7 @@ defmodule Absinthe.Incremental.Response do
   @doc """
   Build an error response for a failed incremental operation.
   """
-  @spec build_error(list(map()), list(), String.t() | nil, boolean()) :: incremental_response()
+  @spec build_error([map()], [any()], String.t() | nil, boolean()) :: incremental_response()
   def build_error(errors, path, label, has_next) do
     incremental_item = %{
       errors: errors,
@@ -193,7 +194,7 @@ defmodule Absinthe.Incremental.Response do
     end)
   end
 
-  defp remove_at_path(data, []), do: nil
+  defp remove_at_path(_data, []), do: nil
 
   defp remove_at_path(data, [key | rest]) when is_map(data) do
     case Map.get(data, key) do

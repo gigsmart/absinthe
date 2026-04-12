@@ -71,7 +71,9 @@ defmodule Absinthe.Incremental.Transport do
   alias Absinthe.Incremental.{Config, Response}
   alias Absinthe.Streaming.Executor
 
-  @type conn_or_socket :: Plug.Conn.t() | Phoenix.Socket.t() | any()
+  # Plug.Conn.t() | Phoenix.Socket.t() — optional dependencies, kept as any()
+  # so this module can be used without Plug or Phoenix.
+  @type conn_or_socket :: any()
   @type state :: any()
   @type response :: map()
 
@@ -234,6 +236,7 @@ defmodule Absinthe.Incremental.Transport do
 
         # Get configurable executor (defaults to TaskExecutor)
         executor = Absinthe.Streaming.Executor.get_executor(schema, options)
+
         executor_opts = [
           timeout: timeout,
           max_concurrency: System.schedulers_online() * 2
@@ -488,6 +491,7 @@ defmodule Absinthe.Incremental.Transport do
 
     # Use configurable executor (defaults to TaskExecutor)
     executor = Executor.get_executor(schema, options)
+
     incremental_results =
       all_tasks
       |> executor.execute(timeout: timeout)

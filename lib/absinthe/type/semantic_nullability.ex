@@ -155,7 +155,8 @@ defmodule Absinthe.Type.SemanticNullability do
 
     cond do
       max_level > type_depth ->
-        {:error, "level #{max_level} requires #{max_level} nested list(s), but type only has #{type_depth}"}
+        {:error,
+         "level #{max_level} requires #{max_level} nested list(s), but type only has #{type_depth}"}
 
       Enum.any?(levels, &(&1 < 0)) ->
         {:error, "levels must be non-negative integers"}

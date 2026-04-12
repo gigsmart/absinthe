@@ -44,7 +44,8 @@ defmodule Absinthe.Blueprint.Schema.InterfaceTypeDefinition do
       fields: Blueprint.Schema.ObjectTypeDefinition.build_fields(type_def, schema),
       identifier: type_def.identifier,
       resolve_type: type_def.resolve_type,
-      applied_directives: Blueprint.Schema.ObjectTypeDefinition.build_applied_directives(type_def.directives),
+      applied_directives:
+        Blueprint.Schema.ObjectTypeDefinition.build_applied_directives(type_def.directives),
       definition: type_def.module,
       interfaces: type_def.interfaces
     }

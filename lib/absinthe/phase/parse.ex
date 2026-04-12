@@ -116,7 +116,9 @@ defmodule Absinthe.Phase.Parse do
     %Phase.Error{message: message, locations: [%{line: line, column: column}], phase: __MODULE__}
   end
 
-  @spec format_raw_parse_error({:unicode_escape, String.t(), {line :: pos_integer, column :: pos_integer}}) ::
+  @spec format_raw_parse_error(
+          {:unicode_escape, String.t(), {line :: pos_integer, column :: pos_integer}}
+        ) ::
           Phase.Error.t()
   defp format_raw_parse_error({:unicode_escape, message, {line, column}}) do
     %Phase.Error{message: message, locations: [%{line: line, column: column}], phase: __MODULE__}

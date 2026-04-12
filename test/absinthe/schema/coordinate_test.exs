@@ -104,7 +104,9 @@ defmodule Absinthe.Schema.CoordinateTest do
 
     test "parse/1 parses argument coordinates" do
       assert Coordinate.parse("Query.user(id:)") == {:ok, {:argument, "Query", "user", "id"}}
-      assert Coordinate.parse("User.posts(limit:)") == {:ok, {:argument, "User", "posts", "limit"}}
+
+      assert Coordinate.parse("User.posts(limit:)") ==
+               {:ok, {:argument, "User", "posts", "limit"}}
     end
 
     test "parse/1 parses directive coordinates" do
@@ -113,7 +115,9 @@ defmodule Absinthe.Schema.CoordinateTest do
     end
 
     test "parse/1 parses directive argument coordinates" do
-      assert Coordinate.parse("@deprecated(reason:)") == {:ok, {:directive_argument, "deprecated", "reason"}}
+      assert Coordinate.parse("@deprecated(reason:)") ==
+               {:ok, {:directive_argument, "deprecated", "reason"}}
+
       assert Coordinate.parse("@include(if:)") == {:ok, {:directive_argument, "include", "if"}}
     end
 
@@ -167,11 +171,13 @@ defmodule Absinthe.Schema.CoordinateTest do
     end
 
     test "resolve/2 returns error for non-existent type" do
-      assert {:error, "Type not found: NonExistent"} = Coordinate.resolve(TestSchema, "NonExistent")
+      assert {:error, "Type not found: NonExistent"} =
+               Coordinate.resolve(TestSchema, "NonExistent")
     end
 
     test "resolve/2 returns error for non-existent field" do
-      assert {:error, "Field not found: User.nonexistent"} = Coordinate.resolve(TestSchema, "User.nonexistent")
+      assert {:error, "Field not found: User.nonexistent"} =
+               Coordinate.resolve(TestSchema, "User.nonexistent")
     end
 
     test "resolve/2 returns error for non-existent argument" do
@@ -180,11 +186,13 @@ defmodule Absinthe.Schema.CoordinateTest do
     end
 
     test "resolve/2 returns error for non-existent directive" do
-      assert {:error, "Directive not found: @nonexistent"} = Coordinate.resolve(TestSchema, "@nonexistent")
+      assert {:error, "Directive not found: @nonexistent"} =
+               Coordinate.resolve(TestSchema, "@nonexistent")
     end
 
     test "resolve/2 returns error for invalid coordinate" do
-      assert {:error, "Invalid schema coordinate: not valid!"} = Coordinate.resolve(TestSchema, "not valid!")
+      assert {:error, "Invalid schema coordinate: not valid!"} =
+               Coordinate.resolve(TestSchema, "not valid!")
     end
   end
 
