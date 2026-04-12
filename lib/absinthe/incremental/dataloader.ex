@@ -128,7 +128,8 @@ defmodule Absinthe.Incremental.Dataloader do
   This allows existing Dataloader resolvers to work with incremental delivery.
   """
   @spec streaming_dataloader(atom(), any()) ::
-          (Resolution.source(), Resolution.arguments(), Resolution.t() -> {:ok, any()} | {:error, any()} | {:middleware, module(), any()})
+          (Resolution.source(), Resolution.arguments(), Resolution.t() ->
+             {:ok, any()} | {:error, any()} | {:middleware, module(), any()})
   def streaming_dataloader(source, batch_key \\ nil) do
     fn parent, args, %{context: context} = resolution ->
       # Check if we're in a streaming context
