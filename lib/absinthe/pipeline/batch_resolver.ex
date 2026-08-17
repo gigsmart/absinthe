@@ -68,6 +68,10 @@ defmodule Absinthe.Pipeline.BatchResolver do
     {:lists.reverse(results), exec}
   end
 
+  defp execute([:error | rest], phases, abort_on_error?, results, exec) do
+    execute(rest, phases, abort_on_error?, [:error | results], exec)
+  end
+
   defp execute([bp | rest], phases, abort_on_error?, results, exec) do
     bp
     |> update_exec(exec)
