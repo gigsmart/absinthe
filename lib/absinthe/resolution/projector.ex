@@ -12,51 +12,71 @@ defmodule Absinthe.Resolution.Projector do
   field merging, and other wonderful stuff like that.
   """
   def project(selections, %{identifier: parent_ident} = parent_type, path, cache, exec) do
-    path =
-      for %{parent_type: %{identifier: i}, name: name, alias: alias} <- path do
-        {i, alias || name}
-      end
-
-    key = [parent_ident | path]
+    key = cache_key(parent_ident, path)
 
     case Map.fetch(cache, key) do
       {:ok, fields} ->
         {fields, cache}
 
       _ ->
-        fields =
-          selections
-          |> collect(parent_type, exec)
-          |> rectify_order
-
+        {fields, []} = collect(selections, parent_type, exec, false)
         {fields, Map.put(cache, key, fields)}
     end
+  end
+
+  @doc """
+  Like `project/5`, except that `@defer`red fragments whose type condition passes
+  are returned separately, in document order, instead of being collected.
+  """
+  def project_with_deferred(
+        selections,
+        %{identifier: parent_ident} = parent_type,
+        path,
+        cache,
+        exec
+      ) do
+    # Disjoint from `project/5` keys: look-ahead through `Absinthe.Resolution.project/2`
+    # shares this cache and must keep seeing deferred fields.
+    key = {:deferred, cache_key(parent_ident, path)}
+
+    case Map.fetch(cache, key) do
+      {:ok, {fields, deferred}} ->
+        {fields, deferred, cache}
+
+      _ ->
+        {fields, deferred} = projection = collect(selections, parent_type, exec, true)
+        {fields, deferred, Map.put(cache, key, projection)}
+    end
+  end
+
+  defp cache_key(parent_ident, path) do
+    path =
+      for %{parent_type: %{identifier: i}, name: name, alias: alias} <- path do
+        {i, alias || name}
+      end
+
+    [parent_ident | path]
   end
 
   defp response_key(%{alias: nil, name: name}), do: name
   defp response_key(%{alias: alias}), do: alias
   defp response_key(%{name: name}), do: name
 
-  defp collect(selections, parent_type, %{fragments: fragments, schema: schema}) do
-    {acc, _index} = do_collect(selections, fragments, parent_type, schema, 0, %{})
-    acc
+  defp collect(selections, parent_type, %{fragments: fragments, schema: schema}, defer?) do
+    ctx = %{fragments: fragments, parent_type: parent_type, schema: schema, defer?: defer?}
+    {acc, _index, deferred} = do_collect(selections, ctx, {%{}, 0, []})
+    {rectify_order(acc), Enum.reverse(deferred)}
   end
 
-  defp do_collect([], _, _, _, index, acc), do: {acc, index}
+  defp do_collect([], _ctx, state), do: state
 
-  defp do_collect([selection | selections], fragments, parent_type, schema, index, acc) do
+  defp do_collect([selection | selections], ctx, {acc, index, deferred} = state) do
     case selection do
       %{flags: %{skip: _}} ->
-        do_collect(selections, fragments, parent_type, schema, index, acc)
-
-      # Skip nodes that have been explicitly marked for skipping in streaming resolution
-      # Note: :defer and :stream flags alone do NOT cause skipping in standard resolution
-      # Only :__skip_initial__ flag (set by streaming_resolution) causes skipping
-      %{flags: %{__skip_initial__: true}} ->
-        do_collect(selections, fragments, parent_type, schema, index, acc)
+        do_collect(selections, ctx, state)
 
       %Blueprint.Document.Field{} = field ->
-        field = update_schema_node(field, parent_type)
+        field = update_schema_node(field, ctx.parent_type)
         key = response_key(field)
 
         acc =
@@ -64,42 +84,39 @@ defmodule Absinthe.Resolution.Projector do
             {existing_index, [field | fields]}
           end)
 
-        do_collect(selections, fragments, parent_type, schema, index + 1, acc)
+        do_collect(selections, ctx, {acc, index + 1, deferred})
 
       %Blueprint.Document.Fragment.Inline{
         type_condition: %{schema_node: condition},
         selections: inner_selections
       } ->
-        {acc, index} =
-          conditionally_collect(
-            condition,
-            inner_selections,
-            fragments,
-            parent_type,
-            schema,
-            index,
-            acc
-          )
-
-        do_collect(selections, fragments, parent_type, schema, index, acc)
+        state = collect_fragment(selection, condition, inner_selections, ctx, state)
+        do_collect(selections, ctx, state)
 
       %Blueprint.Document.Fragment.Spread{name: name} ->
-        %{type_condition: condition, selections: inner_selections} = Map.fetch!(fragments, name)
+        %{type_condition: condition, selections: inner_selections} =
+          Map.fetch!(ctx.fragments, name)
 
-        {acc, index} =
-          conditionally_collect(
-            condition,
-            inner_selections,
-            fragments,
-            parent_type,
-            schema,
-            index,
-            acc
-          )
-
-        do_collect(selections, fragments, parent_type, schema, index, acc)
+        state = collect_fragment(selection, condition, inner_selections, ctx, state)
+        do_collect(selections, ctx, state)
     end
   end
+
+  defp collect_fragment(fragment, condition, selections, ctx, {acc, index, deferred} = state) do
+    cond do
+      not passes_type_condition?(normalize_condition(condition, ctx.schema), ctx.parent_type) ->
+        state
+
+      ctx.defer? and deferred?(fragment) ->
+        {acc, index, [fragment | deferred]}
+
+      true ->
+        do_collect(selections, ctx, state)
+    end
+  end
+
+  defp deferred?(%{flags: %{defer: %{enabled: true}}}), do: true
+  defp deferred?(_), do: false
 
   defp rectify_order(grouped_fields) do
     grouped_fields
@@ -119,16 +136,6 @@ defmodule Absinthe.Resolution.Projector do
 
   defp flatten([%{selections: selections} | fields], acc) do
     flatten(fields, selections ++ acc)
-  end
-
-  defp conditionally_collect(condition, selections, fragments, parent_type, schema, index, acc) do
-    condition
-    |> normalize_condition(schema)
-    |> passes_type_condition?(parent_type)
-    |> case do
-      true -> do_collect(selections, fragments, parent_type, schema, index, acc)
-      false -> {acc, index}
-    end
   end
 
   # necessary when the field in question is on an abstract type.

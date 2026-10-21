@@ -8,6 +8,8 @@ defmodule Absinthe.Phase.Document.Execution.Resolution do
 
   alias Absinthe.{Blueprint, Type, Phase}
   alias Blueprint.{Result, Execution}
+  alias Blueprint.Execution.DeferredFragment
+  alias Absinthe.Resolution.Projector
 
   alias Absinthe.Phase
   use Absinthe.Phase
@@ -43,24 +45,19 @@ defmodule Absinthe.Phase.Document.Execution.Resolution do
   defp perform_resolution(bp_root, operation, options) do
     exec = Execution.get(bp_root, operation)
 
+    exec =
+      if Keyword.get(options, :incremental, false) do
+        %{exec | acc: Map.put_new(exec.acc, DeferredFragment, [])}
+      else
+        exec
+      end
+
     plugins = bp_root.schema.plugins()
     run_callbacks? = Keyword.get(options, :plugin_callbacks, true)
 
     exec = plugins |> run_callbacks(:before_resolution, exec, run_callbacks?)
 
-    common =
-      Map.take(exec, [:adapter, :context, :acc, :root_value, :schema, :fragments, :fields_cache])
-
-    res =
-      %Absinthe.Resolution{
-        path: nil,
-        source: nil,
-        parent_type: nil,
-        middleware: nil,
-        definition: nil,
-        arguments: nil
-      }
-      |> Map.merge(common)
+    res = build_root_resolution(exec)
 
     {result, res} =
       exec.result
@@ -72,6 +69,69 @@ defmodule Absinthe.Phase.Document.Execution.Resolution do
     exec = plugins |> run_callbacks(:after_resolution, exec, run_callbacks?)
 
     %{exec | result: result}
+  end
+
+  @doc false
+  # Resolves one wave of deferred fragments with a shared resolution struct, so a
+  # single dataloader batch covers every record. Fragments deferred inside them are
+  # left in `execution.acc` for the next wave. Results are returned in record order.
+  @spec resolve_deferred(Blueprint.t(), [DeferredFragment.t()]) ::
+          {Blueprint.t(), [Result.Object.t() | Result.Leaf.t()]}
+  def resolve_deferred(bp_root, records) do
+    plugins = bp_root.schema.plugins()
+
+    slots =
+      Enum.map(records, fn record ->
+        {%Result.Object{root_value: record.source, emitter: record.emitter}, %{}}
+      end)
+
+    {exec, slots} = resolve_deferred_round(bp_root.execution, records, slots, plugins)
+
+    {%{bp_root | execution: exec}, Enum.map(slots, &elem(&1, 0))}
+  end
+
+  defp resolve_deferred_round(exec, records, slots, plugins) do
+    exec = run_callbacks(plugins, :before_resolution, exec, true)
+
+    {slots, res} =
+      records
+      |> Enum.zip(slots)
+      |> Enum.map_reduce(build_root_resolution(exec), fn {record, {result, cache}}, res ->
+        {result, res} =
+          result
+          |> walk_result(
+            record.emitter,
+            record.parent_type,
+            %{res | fields_cache: cache},
+            record.path
+          )
+          |> propagate_null_trimming()
+
+        {{result, res.fields_cache}, res}
+      end)
+
+    exec = %{update_persisted_fields(exec, res) | fields_cache: exec.fields_cache}
+    exec = run_callbacks(plugins, :after_resolution, exec, true)
+
+    case Absinthe.Plugin.pipeline(plugins, exec) do
+      [] -> {exec, slots}
+      _ -> resolve_deferred_round(exec, records, slots, plugins)
+    end
+  end
+
+  defp build_root_resolution(exec) do
+    common =
+      Map.take(exec, [:adapter, :context, :acc, :root_value, :schema, :fragments, :fields_cache])
+
+    %Absinthe.Resolution{
+      path: nil,
+      source: nil,
+      parent_type: nil,
+      middleware: nil,
+      definition: nil,
+      arguments: nil
+    }
+    |> Map.merge(common)
   end
 
   defp run_callbacks(plugins, callback, acc, true) do
@@ -131,21 +191,54 @@ defmodule Absinthe.Phase.Document.Execution.Resolution do
         {[], res}
 
       parent_type ->
-        {fields, fields_cache} =
-          Absinthe.Resolution.Projector.project(
-            parent.selections,
-            parent_type,
-            path,
-            res.fields_cache,
-            res
-          )
-
-        res = %{res | fields_cache: fields_cache}
+        {fields, res} = project_fields(parent, parent_type, source, path, res)
 
         {values, res} = do_resolve_fields(fields, res, source, parent_type, path, [])
         {values, %{res | path: path}}
     end
   end
+
+  defp project_fields(parent, parent_type, source, path, res) do
+    if defer_enabled?(parent, res) do
+      {fields, deferred, fields_cache} =
+        Projector.project_with_deferred(
+          parent.selections,
+          parent_type,
+          path,
+          res.fields_cache,
+          res
+        )
+
+      records =
+        Enum.reduce(deferred, Map.fetch!(res.acc, DeferredFragment), fn fragment, records ->
+          {defer, flags} = Map.pop(fragment.flags, :defer)
+
+          record = %DeferredFragment{
+            label: Map.get(defer, :label),
+            emitter: %{parent | selections: [%{fragment | flags: flags}]},
+            parent_type: parent_type,
+            source: source,
+            path: path
+          }
+
+          [record | records]
+        end)
+
+      acc = Map.put(res.acc, DeferredFragment, records)
+      {fields, %{res | fields_cache: fields_cache, acc: acc}}
+    else
+      {fields, fields_cache} =
+        Projector.project(parent.selections, parent_type, path, res.fields_cache, res)
+
+      {fields, %{res | fields_cache: fields_cache}}
+    end
+  end
+
+  # Root fields of mutations and subscriptions run inline; defers below them still apply.
+  defp defer_enabled?(%Blueprint.Document.Operation{type: type}, _res) when type != :query,
+    do: false
+
+  defp defer_enabled?(_parent, %{acc: acc}), do: Map.has_key?(acc, DeferredFragment)
 
   defp get_return_type(%{schema_node: %Type.Field{type: type}}) do
     Type.unwrap(type)

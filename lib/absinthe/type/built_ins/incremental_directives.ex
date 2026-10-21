@@ -19,20 +19,20 @@ defmodule Absinthe.Type.BuiltIns.IncrementalDirectives do
         end
       end
 
-  You will also need to enable incremental delivery in your pipeline:
+  To execute `@defer` incrementally, enable it on the pipeline and drive the
+  deferred waves with `Absinthe.Incremental`:
 
-      pipeline_modifier = fn pipeline, _options ->
-        Absinthe.Pipeline.Incremental.enable(pipeline,
-          enabled: true,
-          enable_defer: true,
-          enable_stream: true
-        )
-      end
+      pipeline =
+        MyApp.Schema
+        |> Absinthe.Pipeline.for_document(context: context)
+        |> Absinthe.Incremental.enable()
 
-      Absinthe.run(query, MyApp.Schema,
-        variables: variables,
-        pipeline_modifier: pipeline_modifier
-      )
+      {:ok, blueprint, _phases} = Absinthe.Pipeline.run(query, pipeline)
+      initial = Absinthe.Incremental.initial_payload(blueprint)
+      {next, blueprint} = Absinthe.Incremental.next(blueprint)
+
+  Without `Absinthe.Incremental.enable/1`, deferred fragments resolve inline.
+  `@stream` is accepted but always returns the complete list.
 
   ## Directives
 

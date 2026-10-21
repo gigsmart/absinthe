@@ -1,24 +1,11 @@
 defmodule Absinthe.Subscription.Local do
   @moduledoc """
-  This module handles broadcasting documents that are local to this node.
-
-  ## Incremental Delivery Support
-
-  When a subscription document contains `@defer` or `@stream` directives,
-  this module automatically uses incremental delivery. The subscription will
-  receive multiple payloads:
-
-  1. Initial response with immediately available data
-  2. Incremental responses as deferred/streamed content resolves
-
-  This is handled transparently by calling `publish_subscription/2` multiple
-  times with the standard GraphQL incremental delivery format.
+  This module handles broadcasting documents that are local to this node
   """
 
   require Logger
 
   alias Absinthe.Pipeline.BatchResolver
-  alias Absinthe.Streaming
 
   # This module handles running and broadcasting documents that are local to this
   # node.
@@ -53,33 +40,18 @@ defmodule Absinthe.Subscription.Local do
   defp run_docset(pubsub, docs_and_topics, mutation_result) do
     for {topic, key_strategy, doc} <- docs_and_topics do
       try do
-        # Check if document has @defer/@stream directives
-        enable_incremental = Streaming.has_streaming_directives?(doc.source)
-        pipeline = pipeline(doc, mutation_result, enable_incremental: enable_incremental)
+        pipeline = pipeline(doc, mutation_result)
 
-        {:ok, blueprint, _} = Absinthe.Pipeline.run(doc.source, pipeline)
-        data = blueprint.result
+        {:ok, %{result: data}, _} = Absinthe.Pipeline.run(doc.source, pipeline)
 
-        # Check if we have streaming tasks to deliver incrementally
-        if enable_incremental && Streaming.has_streaming_tasks?(blueprint) do
-          Logger.debug("""
-          Absinthe Subscription Publication (Incremental)
-          Field Topic: #{inspect(key_strategy)}
-          Subscription id: #{inspect(topic)}
-          Streaming: true
-          """)
+        Logger.debug("""
+        Absinthe Subscription Publication
+        Field Topic: #{inspect(key_strategy)}
+        Subscription id: #{inspect(topic)}
+        Data: #{inspect(data)}
+        """)
 
-          Streaming.Delivery.deliver(pubsub, topic, blueprint)
-        else
-          Logger.debug("""
-          Absinthe Subscription Publication
-          Field Topic: #{inspect(key_strategy)}
-          Subscription id: #{inspect(topic)}
-          Data: #{inspect(data)}
-          """)
-
-          :ok = pubsub.publish_subscription(topic, data)
-        end
+        :ok = pubsub.publish_subscription(topic, data)
       rescue
         e ->
           BatchResolver.pipeline_error(e, __STACKTRACE__)
@@ -87,17 +59,7 @@ defmodule Absinthe.Subscription.Local do
     end
   end
 
-  @doc """
-  Build the execution pipeline for a subscription document.
-
-  ## Options
-
-  - `:enable_incremental` - If `true`, uses `StreamingResolution` phase to
-    support @defer/@stream directives (default: `false`)
-  """
-  def pipeline(doc, mutation_result, opts \\ []) do
-    enable_incremental = Keyword.get(opts, :enable_incremental, false)
-
+  def pipeline(doc, mutation_result) do
     pipeline =
       doc.initial_phases
       |> Pipeline.replace(
@@ -109,18 +71,7 @@ defmodule Absinthe.Subscription.Local do
         Phase.Document.Execution.Resolution,
         {Phase.Document.OverrideRoot, root_value: mutation_result}
       )
-
-    # Use StreamingResolution when incremental delivery is enabled
-    pipeline =
-      if enable_incremental do
-        pipeline
-        |> Pipeline.replace(
-          Phase.Document.Execution.Resolution,
-          Phase.Document.Execution.StreamingResolution
-        )
-      else
-        pipeline |> Pipeline.upto(Phase.Document.Execution.Resolution)
-      end
+      |> Pipeline.upto(Phase.Document.Execution.Resolution)
 
     pipeline = [
       pipeline,
