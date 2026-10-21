@@ -28,6 +28,15 @@ defmodule Absinthe.Phase.Document.Result do
     format_result(result, opts)
   end
 
+  @doc false
+  # Formats a single result node (a deferred fragment's) as `{data, errors}`.
+  @spec format_node(Blueprint.Result.Object.t() | Blueprint.Result.Leaf.t(), Keyword.t()) ::
+          {map | nil, [map]}
+  def format_node(node, opts) do
+    {data, errors} = data(node, [])
+    {data, errors |> Enum.uniq() |> Enum.map(&format_error(&1, opts))}
+  end
+
   defp format_result({:ok, {data, []}}, _) do
     %{data: data}
   end
